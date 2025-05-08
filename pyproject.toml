@@ -1,0 +1,13 @@
+[build-system]
+requires = ["flit_core >=3.11,<4"]
+build-backend = "flit_core.buildapi"
+
+[project]
+name = "ssh_manager"
+version = "0.0.1"
+description = "manage ssh"
+
+dependencies = []
+
+[project.scripts]
+ssh-manager = "ssh_manager.app:main"
