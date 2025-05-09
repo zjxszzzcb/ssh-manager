@@ -7,7 +7,7 @@ from typing import List
 
 from ssh_manager.widgets.editor import HostConfigEditor
 from ssh_manager.widgets.host_list import HostListItem
-from ssh_manager.utils.ssh_configs import HostConfig, update_ssh_config, parse_text_to_configs
+from ssh_manager.utils.ssh_configs import HostConfig, update_ssh_config, parse_text_to_configs, delete_ssh_config
 from ssh_manager.utils.terminal_util import open_new_terminal
 
 
@@ -30,6 +30,7 @@ class SSHManagerMainUI(App):
         # 隐藏其他快捷键提示
         Binding("ctrl+s", "save_config", "Save config", show=False),
         Binding("ctrl+c", "quit", "Quit", show=False),
+        Binding("ctrl+d", "delete_config", "Delete config"),
     ]
 
     CSS = """
@@ -151,6 +152,17 @@ class SSHManagerMainUI(App):
             update_ssh_config(config)
             # 将焦点移回列表
             self.action_focus_list()
+    
+    def action_delete_config(self) -> None:
+        """删除当前选中的配置"""
+        list_view = self.query_one(ListView)
+        if list_view.has_focus:
+            delete_ssh_config(self.host_configs[list_view.index].host)
+            self.host_configs.pop(list_view.index)
+            selected_item = list_view.children[list_view.index]
+            selected_item.remove()
+            self.action_focus_list()
+            list_view.index = 0
 
     def action_open_ssh_terminal(self) -> None:
         """打开SSH终端"""

@@ -41,6 +41,12 @@ def update_ssh_config(config: HostConfig):
         f.write(json.dumps([config.model_dump() for config in _KNOWN_SSH_HOSTS.values()]))
 
 
+def delete_ssh_config(host: str):
+    _KNOWN_SSH_HOSTS.pop(host)
+    with open(_KNOWN_SSH_HOSTS_FILE, "w", encoding="utf-8") as f:
+        f.write(json.dumps([config.model_dump() for config in _KNOWN_SSH_HOSTS.values()]))
+
+
 def load_ssh_config_file(file_path: str = _DEFAULT_SSH_CONFIG_FILE) -> Dict[str, HostConfig]:
     """从SSH配置文件加载主机配置
 
@@ -113,8 +119,8 @@ def parse_text_to_configs(text: str) -> Dict[str, HostConfig]:
     for host, config in all_configs.items():
         try:
             host_configs[host] = HostConfig(**config)
-        except Exception as e:
-            print(f"Warning: Failed to parse config for host {host}: {e}")
+        except Exception:
+            print(f"Warning: Failed to parse config for host {host}")
     return host_configs
 
 

@@ -13,4 +13,4 @@ dependencies = [
 ]
 
 [project.scripts]
-ssh-manager = "ssh_manager.app:main"
+mssh = "ssh_manager.app:main"
