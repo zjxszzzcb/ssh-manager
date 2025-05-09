@@ -30,7 +30,7 @@ class SSHManagerMainUI(App):
         # 显示编辑器和退出的快捷键提示
         Binding("e", "focus_editor", "Edit", show=True),
         Binding("escape", "quit", "Quit", show=True),
-        Binding("c", "connect", "Connect", show=False),
+        Binding("c", "connect", "Connect", show=True),
         
         # 隐藏其他快捷键提示
         Binding("ctrl+s", "save_config", "Save config", show=False),
@@ -205,7 +205,16 @@ class SSHManagerMainUI(App):
         """退出应用，但仅在编辑器没有焦点时生效"""
         editor = self.query_one(HostConfigEditor)
         if not editor.has_focus:
+            # 清理所有SSH连接
+            self._cleanup_connections()
             self.exit()
+    
+    def _cleanup_connections(self):
+        for connection in self.connections.values():
+            if isinstance(connection, SSHConnection):
+                connection.terminate()
+                connection.wait()
+        self.connections.clear()
 
     def _update_editor(self, host_item: HostListItem) -> None:
         """更新编辑器内容"""

@@ -20,6 +20,7 @@ class SSHConnection(subprocess.Popen):
             **kwargs
         )
         self.available = False
+        self._running = True
         self.daemon_thread = threading.Thread(target=self.keep_alive, daemon=True)
         self.daemon_thread.start()
         
@@ -30,18 +31,37 @@ class SSHConnection(subprocess.Popen):
         self.stdin.write(command)
         self.stdin.flush()
         time.sleep(5)
-        while True:
-            content = self.stdout.readline()
-            if flag in content:
+        while self._running:
+            try:
+                content = self.stdout.readline()
+                if not content:  # EOF reached
+                    break
+                if flag in content:
+                    break
+                print(content)
+            except (IOError, ValueError):  # 管道已关闭
                 break
-            print(content)
+        
         self.available = True
-        while True:
-            self.stdin.write(command)
-            self.stdin.flush()
-            output = self.stdout.readline()
-            print(output)
-            time.sleep(3)
+        while self._running:
+            try:
+                self.stdin.write(command)
+                self.stdin.flush()
+                output = self.stdout.readline()
+                if not output:  # EOF reached
+                    break
+                print(output)
+                time.sleep(3)
+            except (IOError, ValueError):  # 管道已关闭
+                break
+        
+        self.available = False
+        self._running = False
+
+    def terminate(self) -> None:
+        """重写terminate方法以确保守护线程正确退出"""
+        self._running = False
+        super().terminate()
 
     def is_alive(self):
         return self.poll() is None and self.available
