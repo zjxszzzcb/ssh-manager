@@ -8,8 +8,8 @@ version = "0.0.1"
 description = "manage ssh"
 
 dependencies = [
-    textual,
-    asyncssh,
+    "textual",
+    "asyncssh",
 ]
 
 [project.scripts]
