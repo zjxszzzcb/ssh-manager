@@ -1,5 +1,6 @@
 import os
 import json
+import uuid
 from pydantic import BaseModel
 from typing import Dict, List, Optional
 
@@ -29,6 +30,15 @@ class HostConfig(BaseModel):
 _DEFAULT_SSH_CONFIG_FILE = os.path.expanduser("~/.ssh/config")
 _KNOWN_SSH_HOSTS_FILE = os.path.join(os.path.dirname(__file__), "known_ssh_hosts.json")
 _KNOWN_SSH_HOSTS: Dict[str, HostConfig] = {}
+
+def get_ssh_config_example() -> str:
+    return HostConfig(
+        host=f"ubuntu-{str(uuid.uuid4())[:8]}",
+        hostname="127.0.0.1",
+        user="root",
+        port=22,
+        local_forwards={"8888": "localhost:80"},
+    )
 
 
 def get_ssh_config(host: str) -> Optional[HostConfig]:

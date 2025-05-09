@@ -7,7 +7,10 @@ from typing import List
 
 from ssh_manager.widgets.editor import HostConfigEditor
 from ssh_manager.widgets.host_list import HostListItem
-from ssh_manager.utils.ssh_configs import HostConfig, update_ssh_config, parse_text_to_configs, delete_ssh_config
+from ssh_manager.utils.ssh_configs import (
+    HostConfig, update_ssh_config, parse_text_to_configs, 
+    delete_ssh_config, get_ssh_config_example
+)
 from ssh_manager.utils.terminal_util import open_new_terminal
 
 
@@ -26,11 +29,13 @@ class SSHManagerMainUI(App):
         # 显示编辑器和退出的快捷键提示
         Binding("e", "focus_editor", "Edit", show=True),
         Binding("escape", "quit", "Quit", show=True),
+        Binding("c", "connect", "Connect", show=False),
         
         # 隐藏其他快捷键提示
         Binding("ctrl+s", "save_config", "Save config", show=False),
         Binding("ctrl+c", "quit", "Quit", show=False),
         Binding("ctrl+d", "delete_config", "Delete config"),
+        Binding("ctrl+n", "new_config", "New config"),
     ]
 
     CSS = """
@@ -132,6 +137,19 @@ class SSHManagerMainUI(App):
         """将焦点移动回列表"""
         list_view = self.query_one(ListView)
         list_view.focus()
+
+    def action_new_config(self) -> None:
+        """新建一个配置"""
+        example_config = get_ssh_config_example()
+        self.host_configs.append(example_config)
+        update_ssh_config(example_config)
+        
+        new_item = HostListItem(example_config)
+        list_view = self.query_one(ListView)
+        list_view.append(new_item)
+        list_view.focus()
+        list_view.index = len(list_view.children) - 1
+        self._update_editor(new_item)
 
     def action_save_config(self) -> None:
         """保存当前编辑器中的配置"""

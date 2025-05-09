@@ -34,6 +34,7 @@ class HostListItem(ListItem):
         label = self.query_one(Label)
         label.update(f"{status_dot} {self.host_info.host} ({status_text})")
 
+
 def view_host_item():
     """Demo function to show how HostListItem works."""
     
