@@ -16,8 +16,6 @@ class HostListItem(ListItem):
         Args:
             host_config: The SSH host to represent.
         """
-        # Prefix with 'host-' to make sure it's a valid ID
-        # host_id = f"host-{host_config.host}"
         super().__init__()
         self.host_info = self.HostStatusInfo(**host_config.model_dump())
 
