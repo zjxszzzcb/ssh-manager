@@ -3,7 +3,7 @@ from textual.events import Key
 from textual.containers import Horizontal
 from textual.widgets import ListView, Footer
 from textual.binding import Binding
-from typing import List
+from typing import Dict, List
 
 from ssh_manager.widgets.editor import HostConfigEditor
 from ssh_manager.widgets.host_list import HostListItem
@@ -11,6 +11,7 @@ from ssh_manager.utils.ssh_configs import (
     HostConfig, update_ssh_config, parse_text_to_configs, 
     delete_ssh_config, get_ssh_config_example
 )
+from ssh_manager.utils.ssh_util import SSHConnection, create_persistent_ssh_connection
 from ssh_manager.utils.terminal_util import open_new_terminal
 
 
@@ -81,6 +82,7 @@ class SSHManagerMainUI(App):
 
     def __init__(self, host_configs: List[HostConfig]):
         self.host_configs = host_configs
+        self.connections: Dict[str, SSHConnection] = dict()
         super().__init__()
 
     def compose(self) -> ComposeResult:
@@ -110,6 +112,9 @@ class SSHManagerMainUI(App):
         if len(list_view.children) > 0:
             list_view.index = 0
             self._update_editor(list_view.children[0])
+        
+        # 设置定时器每秒更新一次连接状态
+        self.set_interval(1.0, self._update_connection_status)
 
     def on_list_view_highlighted(self, event: ListView.Highlighted) -> None:
         """当列表项高亮时更新编辑器"""
@@ -181,6 +186,11 @@ class SSHManagerMainUI(App):
             selected_item.remove()
             self.action_focus_list()
             list_view.index = 0
+    
+    def action_connect(self) -> None:
+        list_view = self.query_one(ListView)
+        host_config = self.host_configs[list_view.index]
+        self.connections[host_config.host] = create_persistent_ssh_connection(host_config)
 
     def action_open_ssh_terminal(self) -> None:
         """打开SSH终端"""
@@ -202,11 +212,22 @@ class SSHManagerMainUI(App):
         if isinstance(host_item, HostListItem):
             editor = self.query_one(HostConfigEditor)
             editor.load_text(HostConfigEditor.config_to_text(host_item.host_info))
+
+    def _update_connection_status(self):
+        print("update_status")
+        list_view = self.query_one(ListView)
+        for idx in range(len(list_view.children)):
+            host_item: HostListItem = list_view.children[idx]
+            connection = self.connections.get(host_item.host_info.host)
+            is_alive = connection.is_alive() if isinstance(connection, SSHConnection) else False
+            host_item.host_info.is_alive = is_alive
+            host_item.update_status()
             
     def on_key(self, event: Key) -> None:
         """处理按键事件"""
         if event.key == "enter":
             self.action_open_ssh_terminal()
+
 
 def view_main_ui():
     # 示例用法
@@ -228,6 +249,7 @@ def view_main_ui():
     ]
     ui = SSHManagerMainUI(demo_configs)
     ui.run()
+
 
 if __name__ == "__main__":
     view_main_ui()
