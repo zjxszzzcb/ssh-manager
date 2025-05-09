@@ -10,8 +10,20 @@ class HostConfig(BaseModel):
     user: str
     password: Optional[str] = None
     port: int = 22
-    local_forwards: List[Dict[str, str]] = []
-    remote_forwards: List[Dict[str, str]] = []
+    local_forwards: Dict[str, str] = {}
+    remote_forwards: Dict[str, str] = {}
+    
+    def get_ssh_command(self) -> List[str]:
+        connect_commands = ['ssh', '-p', str(self.port), f'{self.user}@{self.hostname}']
+        local_forwards_commands = []
+        for local_port, remote_host_port in self.local_forwards.items():
+            local_forwards_commands.extend(["-L", f"{local_port}:{remote_host_port}"])
+        return connect_commands + local_forwards_commands
+
+    def update_config(self, config: "HostConfig"):
+        self_config = self.model_dump(mode='json')
+        self_config.update(config.model_dump(mode='json'))
+        return self.__class__(**self_config)
 
 
 _DEFAULT_SSH_CONFIG_FILE = os.path.expanduser("~/.ssh/config")
@@ -41,63 +53,81 @@ def load_ssh_config_file(file_path: str = _DEFAULT_SSH_CONFIG_FILE) -> Dict[str,
     if not os.path.exists(file_path):
         return {}
 
-    configs: Dict[str, Dict[str, str]] = {}
+    with open(file_path, "r", encoding="utf-8") as f:
+        text = f.read()
+
+    host_configs = parse_text_to_configs(text)
+
+    return host_configs
+
+def parse_text_to_configs(text: str) -> Dict[str, HostConfig]:
+    text_lines = text.splitlines()
+
+    all_configs: Dict[str, Dict[str, str]] = {}
     current_host = None
     current_config = {}
 
-    with open(file_path, "r", encoding="utf-8") as f:
-        for line in f:
-            line = line.strip()
-            if not line or line.startswith("#"):
-                continue
+    for line in text_lines:
+        line = line.strip()
+        if not line or line.startswith("#"):
+            continue
 
-            parts = line.split(None, 1)
-            if len(parts) != 2:
-                continue
+        parts = line.split()
 
-            key, value = parts
-            key = key.lower()
+        if len(parts) < 2:
+            continue
 
-            if key == "host":
-                # 保存前一个主机的配置
-                if current_host and current_config:
-                    configs[current_host] = current_config
+        key, values = parts[0], parts[1:]
+        key = key.lower()
 
-                # 开始新的主机配置
-                current_host = value
-                current_config = {"host": value}
-            elif current_host:
-                # 添加配置项
-                current_config[key] = value
+        if key == "host":
+            # 保存前一个主机的配置
+            if current_host and current_config:
+                all_configs[current_host] = current_config
 
-        # 保存最后一个主机的配置
-        if current_host and current_config:
-            configs[current_host] = current_config
+            # 开始新的主机配置
+            current_host = values[0]
+            current_config = {"host": values[0]}
+
+        elif current_host and key == 'port':
+            current_config[key] = int(values[0])
+
+        elif current_host and key == 'localforward':
+            current_config.setdefault('local_forwards', dict())
+            current_config['local_forwards'][values[0]] = values[1]
+
+        elif current_host and key == 'remoteforward':
+            current_config.setdefault('remote_forwards', dict())
+            current_config['remote_forwards'][values[0]] = values[1]
+
+        elif current_host:
+            # 添加配置项
+            current_config[key] = values[0]
+
+    # 保存最后一个主机的配置
+    if current_host and current_config:
+        all_configs[current_host] = current_config
 
     # 转换为HostConfig对象
     host_configs: Dict[str, HostConfig] = {}
-    for host, config in configs.items():
+    for host, config in all_configs.items():
         try:
-            # 确保必要的字段存在
-            if "hostname" in config and "user" in config:
-                # 转换端口为整数
-                if "port" in config:
-                    config["port"] = int(config["port"])
-                
-                host_configs[host] = HostConfig(**config)
+            host_configs[host] = HostConfig(**config)
         except Exception as e:
             print(f"Warning: Failed to parse config for host {host}: {e}")
-
     return host_configs
 
 
 def load_known_ssh_hosts() -> Dict[str, HostConfig]:
     if not os.path.exists(_KNOWN_SSH_HOSTS_FILE):
         return {}
-
+    
     with open(_KNOWN_SSH_HOSTS_FILE, "r", encoding="utf-8") as f:
         data = json.load(f)
-    return {config["host"]: HostConfig(**config) for config in data}
+    
+    _KNOWN_SSH_HOSTS.update({config["host"]: HostConfig(**config) for config in data})
+    
+    return _KNOWN_SSH_HOSTS
 
 if __name__ == "__main__":
-    print(load_ssh_config_file())
+    print(load_ssh_config_file()['zzzcb-ubuntu'].get_ssh_command())

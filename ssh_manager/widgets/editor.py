@@ -20,6 +20,13 @@ class HostConfigEditor(TextArea):
             f"{indent}Password {host_config.password}\n" if host_config.password else "",
             f"{indent}Port {host_config.port}\n",
         ]
+        
+        for local_port, remote_host_port in host_config.local_forwards.items():
+            text_items.append(f"{indent}LocalForward {local_port} {remote_host_port}\n")
+            
+        # for remote_port, local_host_port in host_config.remote_forwards.items():
+        #     text_items.append(f"{indent}RemoteForward {remote_port} {local_host_port}\n")
+        
         return "".join(text_items)
 
 

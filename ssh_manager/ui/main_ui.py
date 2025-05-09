@@ -1,13 +1,15 @@
 from textual.app import App, ComposeResult
+from textual.events import Key
 from textual.containers import Horizontal
 from textual.widgets import ListView, Footer
 from textual.binding import Binding
-from textual.message import Message
 from typing import List
 
 from ssh_manager.widgets.editor import HostConfigEditor
 from ssh_manager.widgets.host_list import HostListItem
-from ssh_manager.utils.ssh_configs import HostConfig
+from ssh_manager.utils.ssh_configs import HostConfig, update_ssh_config, parse_text_to_configs
+from ssh_manager.utils.terminal_util import open_new_terminal
+
 
 class SSHManagerMainUI(App):
     """SSH Manager 主界面
@@ -26,7 +28,7 @@ class SSHManagerMainUI(App):
         Binding("escape", "quit", "Quit", show=True),
         
         # 隐藏其他快捷键提示
-        Binding("ctrl+s", "focus_list", "Focus list", show=False),
+        Binding("ctrl+s", "save_config", "Save config", show=False),
         Binding("ctrl+c", "quit", "Quit", show=False),
     ]
 
@@ -122,12 +124,42 @@ class SSHManagerMainUI(App):
     def action_focus_editor(self) -> None:
         """将焦点移动到编辑器"""
         editor = self.query_one(HostConfigEditor)
-        editor.focus()
+        if not editor.has_focus:
+            editor.focus()
 
     def action_focus_list(self) -> None:
         """将焦点移动回列表"""
         list_view = self.query_one(ListView)
         list_view.focus()
+
+    def action_save_config(self) -> None:
+        """保存当前编辑器中的配置"""
+        editor = self.query_one(HostConfigEditor)
+        list_view = self.query_one(ListView)
+        if editor.has_focus:
+            # 从编辑器文本解析配置
+            config = list(parse_text_to_configs(editor.text).values())[0]
+            print(config)
+            
+            selected_item = list_view.children[list_view.index]
+            selected_item.host_info = selected_item.host_info.update_config(config)
+            selected_item.update_status()
+            self.host_configs[list_view.index] = selected_item.host_info
+            
+            print(selected_item.host_info)
+            # 更新配置
+            update_ssh_config(config)
+            # 将焦点移回列表
+            self.action_focus_list()
+
+    def action_open_ssh_terminal(self) -> None:
+        """打开SSH终端"""
+        print("open ssh terminal")
+        list_view = self.query_one(ListView)
+        if list_view.has_focus:
+            config = self.host_configs[list_view.index]
+            print(config.get_ssh_command())
+            open_new_terminal(config.get_ssh_command())
 
     def action_quit(self) -> None:
         """退出应用，但仅在编辑器没有焦点时生效"""
@@ -140,6 +172,11 @@ class SSHManagerMainUI(App):
         if isinstance(host_item, HostListItem):
             editor = self.query_one(HostConfigEditor)
             editor.load_text(HostConfigEditor.config_to_text(host_item.host_info))
+            
+    def on_key(self, event: Key) -> None:
+        """处理按键事件"""
+        if event.key == "enter":
+            self.action_open_ssh_terminal()
 
 def view_main_ui():
     # 示例用法

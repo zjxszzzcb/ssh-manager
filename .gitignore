@@ -3,3 +3,5 @@
 __pycache__/
 
 test.py
+
+known_ssh_hosts.json

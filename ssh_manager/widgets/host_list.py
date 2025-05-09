@@ -29,7 +29,10 @@ class HostListItem(ListItem):
         """Update the status display."""
         status_dot = "[green]●[/]" if self.host_info.is_alive else "[red]●[/]"
         status_text = "active" if self.host_info.is_alive else "offline"
-        self.update(f"{status_dot} {self.host_info.host} ({status_text})")
+        
+        # Get the first Label widget and update its content
+        label = self.query_one(Label)
+        label.update(f"{status_dot} {self.host_info.host} ({status_text})")
 
 def view_host_item():
     """Demo function to show how HostListItem works."""
