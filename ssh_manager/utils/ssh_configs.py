@@ -31,7 +31,7 @@ _DEFAULT_SSH_CONFIG_FILE = os.path.expanduser("~/.ssh/config")
 _KNOWN_SSH_HOSTS_FILE = os.path.join(os.path.dirname(__file__), "known_ssh_hosts.json")
 _KNOWN_SSH_HOSTS: Dict[str, HostConfig] = {}
 
-def get_ssh_config_example() -> str:
+def get_ssh_config_example() -> HostConfig:
     return HostConfig(
         host=f"ubuntu-{str(uuid.uuid4())[:8]}",
         hostname="127.0.0.1",
