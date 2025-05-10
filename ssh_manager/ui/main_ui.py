@@ -1,6 +1,7 @@
 from textual.app import App, ComposeResult
 from textual.events import Key
 from textual.containers import Horizontal
+from textual.widget import Widget
 from textual.widgets import ListView, Footer
 from textual.binding import Binding
 from typing import Dict, List
@@ -13,6 +14,7 @@ from ssh_manager.utils.ssh_configs import (
 )
 from ssh_manager.utils.ssh_util import SSHConnection, create_persistent_ssh_connection
 from ssh_manager.utils.terminal_util import open_new_terminal
+from ssh_manager.ui.ssh_conn_ui import SSHConnUI
 
 
 class SSHManagerMainUI(App):
@@ -166,6 +168,7 @@ class SSHManagerMainUI(App):
             print(config)
             
             selected_item = list_view.children[list_view.index]
+            assert isinstance(selected_item, HostListItem)
             selected_item.host_info = selected_item.host_info.update_config(config)
             selected_item.update_status()
             self.host_configs[list_view.index] = selected_item.host_info
@@ -188,8 +191,10 @@ class SSHManagerMainUI(App):
             list_view.index = 0
     
     def action_connect(self) -> None:
+        print("[DEBUG] action_connect triggered")
         list_view = self.query_one(ListView)
         host_config = self.host_configs[list_view.index]
+        print(f"[DEBUG] Creating connection for host: {host_config.host}")
         self.connections[host_config.host] = create_persistent_ssh_connection(host_config)
 
     def action_open_ssh_terminal(self) -> None:
@@ -200,6 +205,12 @@ class SSHManagerMainUI(App):
             config = self.host_configs[list_view.index]
             print(config.get_ssh_command())
             open_new_terminal(config.get_ssh_command())
+            # Switch to connection management UI
+            print("[DEBUG] Creating SSHConnUI instance")
+            conn_ui = SSHConnUI(config)
+            print("[DEBUG] Pushing screen")
+            self.push_screen(conn_ui)
+            print("[DEBUG] Screen pushed")
 
     def action_quit(self) -> None:
         """退出应用，但仅在编辑器没有焦点时生效"""
@@ -216,7 +227,7 @@ class SSHManagerMainUI(App):
                 connection.wait()
         self.connections.clear()
 
-    def _update_editor(self, host_item: HostListItem) -> None:
+    def _update_editor(self, host_item: Widget) -> None:
         """更新编辑器内容"""
         if isinstance(host_item, HostListItem):
             editor = self.query_one(HostConfigEditor)
@@ -226,7 +237,8 @@ class SSHManagerMainUI(App):
         print("update_status")
         list_view = self.query_one(ListView)
         for idx in range(len(list_view.children)):
-            host_item: HostListItem = list_view.children[idx]
+            host_item = list_view.children[idx]
+            assert isinstance(host_item, HostListItem)
             connection = self.connections.get(host_item.host_info.host)
             is_alive = connection.is_alive() if isinstance(connection, SSHConnection) else False
             host_item.host_info.is_alive = is_alive
@@ -234,8 +246,15 @@ class SSHManagerMainUI(App):
             
     def on_key(self, event: Key) -> None:
         """处理按键事件"""
+        print(f"[DEBUG] Key pressed: {event.key}")
         if event.key == "enter":
-            self.action_open_ssh_terminal()
+            print("[DEBUG] Enter key detected")
+            list_view = self.query_one(ListView)
+            if list_view.has_focus:
+                print("[DEBUG] ListView has focus, connecting...")
+                self.action_open_ssh_terminal()
+            else:
+                print("[DEBUG] ListView does not have focus")
 
 
 def view_main_ui():
