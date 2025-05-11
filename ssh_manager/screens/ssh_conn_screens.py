@@ -2,9 +2,8 @@ from textual import on, events
 from textual.app import ComposeResult
 from textual.screen import Screen
 from textual.binding import Binding
-from textual.widgets import Button, DataTable
+from textual.widgets import Button, DataTable, Footer
 from textual.containers import Vertical
-from textual.coordinate import Coordinate
 
 from ssh_manager.widgets.proxy_table import ProxyManageTable
 from ssh_manager.utils.ssh_configs import HostConfig
@@ -72,7 +71,8 @@ class SSHConnScreen(Screen):
             table = ProxyManageTable(local_forwards)
             table.can_focus = True
             yield table
-    
+
+        yield Footer()
     def on_mount(self) -> None:
         """初始化界面"""
         print("[DEBUG] SSHConnUI on_mount")
@@ -84,12 +84,10 @@ class SSHConnScreen(Screen):
     
     def on_key(self, event: events.Key) -> None:
         if event.key == "up":
-            self.notify("up")
             if self.cursor_up():
                 # 如果我们处理了这个事件，阻止它继续传播
                 event.stop()
         elif event.key == "down":
-            self.notify("down")
             if self.cursor_down():
                 # 如果我们处理了这个事件，阻止它继续传播
                 event.stop()
@@ -104,7 +102,6 @@ class SSHConnScreen(Screen):
             # 如果表格有焦点且光标在第一行，切换到按钮
             print(f"table.cursor_row: {table.cursor_row}")
             if table.cursor_row == 0:
-                self.notify("focus button")
                 button.focus()
                 return True
             # 否则让表格处理向上导航
@@ -133,7 +130,6 @@ class SSHConnScreen(Screen):
     def new_shell(self) -> None:
         """打开SSH终端"""
         print("[DEBUG] New shell button clicked")
-        self.notify("new shell")
         ssh_command = self.host_config.get_ssh_command()
         print(f"[DEBUG] Generated SSH command: {ssh_command}")
         open_new_terminal(ssh_command)
