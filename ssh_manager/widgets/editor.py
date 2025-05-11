@@ -106,7 +106,7 @@ class EditableTableWidget(Widget):
         header_labels = self.table_data[0]
 
         # 根据标签数量和预设的总宽度 (120) 平均分配宽度，最小宽度为 10
-        column_width = max(10, 120 // len(header_labels) if len(header_labels) > 0 else 10)
+        column_width = max(10, 80 // len(header_labels) if len(header_labels) > 0 else 10)
         
         # 遍历表头，并为每列设置计算出的宽度
         for label_text in header_labels:

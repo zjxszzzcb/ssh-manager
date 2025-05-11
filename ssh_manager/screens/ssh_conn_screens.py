@@ -1,11 +1,59 @@
+from textual import on, events
 from textual.app import ComposeResult
 from textual.screen import Screen
+from textual.binding import Binding
+from textual.widgets import Button, DataTable
+from textual.containers import Vertical
+from textual.coordinate import Coordinate
 
 from ssh_manager.widgets.proxy_table import ProxyManageTable
 from ssh_manager.utils.ssh_configs import HostConfig
+from ssh_manager.utils.terminal_util import open_new_terminal
 
-class SSHConnUI(Screen):
+class SSHConnScreen(Screen):
     """SSH 连接界面"""
+
+    CSS = """
+    Screen {
+        background: $surface;
+    }
+
+    Button {
+        width: 100%;
+        margin: 1;
+        background: $accent;
+        color: $text;
+        border: tall transparent;
+    }
+
+    Button:hover {
+        background: $accent-darken-2;
+    }
+
+    Button:focus {
+        border: tall $accent-lighten-2;
+        background: $accent-darken-1;
+    }
+
+    ProxyManageTable {
+        height: 1fr;
+        margin: 1;
+    }
+
+    DataTable {
+        border: tall transparent;
+    }
+
+    DataTable:focus {
+        border: tall $accent-lighten-2;
+    }
+    """
+
+    BINDINGS = [
+        # Binding("up", "cursor_up", "Up", show=False),
+        # Binding("down", "cursor_down", "Down", show=False),
+        Binding("escape", "app.pop_screen", "Quit", show=True),
+    ]
 
     def __init__(self, host_config: HostConfig):
         print("[DEBUG] Initializing SSHConnUI")
@@ -19,11 +67,76 @@ class SSHConnUI(Screen):
         for local_port, forward_address in self.host_config.local_forwards.items():
             local_forwards.append((local_port, *forward_address.split(":")))
         print(f"[DEBUG] Local forwards: {local_forwards}")
-        yield ProxyManageTable(local_forwards)
-        
+        with Vertical():
+            yield Button("New Shell", id="new_shell")
+            table = ProxyManageTable(local_forwards)
+            table.can_focus = True
+            yield table
+    
     def on_mount(self) -> None:
-        print("[DEBUG] SSHConnUI mounted")
+        """初始化界面"""
+        print("[DEBUG] SSHConnUI on_mount")
+        self.query_one("#new_shell", Button).focus()
+        # 确保表格可以获得焦点
         table = self.query_one(ProxyManageTable)
+        table.can_focus = True
+        table._data_table.can_focus = True
+    
+    def on_key(self, event: events.Key) -> None:
+        if event.key == "up":
+            self.notify("up")
+            if self.cursor_up():
+                # 如果我们处理了这个事件，阻止它继续传播
+                event.stop()
+        elif event.key == "down":
+            self.notify("down")
+            if self.cursor_down():
+                # 如果我们处理了这个事件，阻止它继续传播
+                event.stop()
+    
+    def cursor_up(self) -> bool:
+        """处理向上键：在表格内部导航，当在表格第一行时切换到按钮"""
+        button = self.query_one("#new_shell", Button)
+        table = self.query_one(ProxyManageTable).query_one(DataTable)
+        print(f"[DEBUG] Cursor up - Table has focus: {table.has_focus}")
+        
+        if table.has_focus:
+            # 如果表格有焦点且光标在第一行，切换到按钮
+            print(f"table.cursor_row: {table.cursor_row}")
+            if table.cursor_row == 0:
+                self.notify("focus button")
+                button.focus()
+                return True
+            # 否则让表格处理向上导航
+            return False
+        else:
+            print("table has no focus")
+            return False
+
+    def cursor_down(self) -> bool:
+        """处理向下键：从按钮切换到表格"""
+        button = self.query_one("#new_shell", Button)
+        table = self.query_one(ProxyManageTable).query_one(DataTable)
+        print(f"[DEBUG] Cursor down - Button has focus: {button.has_focus}")
+        
+        if button.has_focus:
+            # 先聚焦到表格的DataTable
+            table.focus()
+            print("table.row_count: ", table.row_count)
+            # 确保表格光标在第一行
+            if table.row_count > 0:
+                table.move_cursor(row=0, column=0, animate=False)
+            return True
+        return False
+
+    @on(Button.Pressed, "#new_shell")
+    def new_shell(self) -> None:
+        """打开SSH终端"""
+        print("[DEBUG] New shell button clicked")
+        self.notify("new shell")
+        ssh_command = self.host_config.get_ssh_command()
+        print(f"[DEBUG] Generated SSH command: {ssh_command}")
+        open_new_terminal(ssh_command)
 
 # 这个独立运行的部分需要修改为使用App来包装Screen
 def view_ssh_conn_ui():
@@ -42,7 +155,7 @@ def view_ssh_conn_ui():
                     "80": "example2.com:443",
                 }
             )
-            self.install_screen(SSHConnUI(host_config), name="ssh_conn")
+            self.install_screen(SSHConnScreen(host_config), name="ssh_conn")
             # 安装完屏幕后，需要推送屏幕使其显示
             self.push_screen("ssh_conn")
 

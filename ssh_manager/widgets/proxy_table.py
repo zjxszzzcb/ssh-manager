@@ -19,7 +19,7 @@ def view_proxy_manage_table():
         
         def on_mount(self) -> None:
             table = self.query_one(ProxyManageTable)
-
+            # table._data_table.move_cursor(row=0, column=1, animate=False)
     app = DataEditTableApp()
     app.run()
 
