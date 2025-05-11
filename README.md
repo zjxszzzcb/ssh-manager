@@ -22,7 +22,12 @@ mssh --init
 mssh
 ```
 
-![main](sources\images\main_ui.png)
+![main](sources/images/main_screen.png)
+
+
+### Connect To Target
+
+![ssh_conn](sources/images/ssh_conn_screen.png)
 
 
 ##  TODO LIST
