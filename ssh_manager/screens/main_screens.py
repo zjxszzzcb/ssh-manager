@@ -123,7 +123,6 @@ class SSHManageMainScreen(Screen):
             editor.load_text(HostConfigEditor.config_to_text(host_item.host_info))
 
     def update_connection_status(self):
-        print("update_status")
         list_view = self.query_one(ListView)
         for idx in range(len(list_view.children)):
             host_item = list_view.children[idx]

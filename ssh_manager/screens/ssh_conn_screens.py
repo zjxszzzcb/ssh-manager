@@ -1,3 +1,5 @@
+from typing import Dict
+
 from textual import on, events
 from textual.app import ComposeResult
 from textual.screen import Screen
@@ -7,6 +9,7 @@ from textual.containers import Vertical
 
 from ssh_manager.widgets.proxy_table import ProxyManageTable
 from ssh_manager.utils.ssh_configs import HostConfig
+from ssh_manager.utils.ssh_util import create_persistent_ssh_connection
 from ssh_manager.utils.terminal_util import open_new_terminal
 
 class SSHConnScreen(Screen):
@@ -59,6 +62,7 @@ class SSHConnScreen(Screen):
         super().__init__()
         self.host_config = host_config
         print(f"[DEBUG] SSHConnUI initialized with host: {host_config.host}")
+        self.set_interval(1/5, self.monitor_proxy_table, name="monitor_proxy_table")
 
     def compose(self) -> ComposeResult:
         print("[DEBUG] SSHConnUI compose called")
@@ -125,6 +129,46 @@ class SSHConnScreen(Screen):
                 table.move_cursor(row=0, column=0, animate=False)
             return True
         return False
+
+    def monitor_proxy_table(self) -> None:
+        """监控代理表"""
+        # print("[DEBUG] Monitoring proxy table")
+        
+        table = self.query_one(ProxyManageTable).query_one(DataTable)
+        
+        # 打印表格中的每行数据
+        local_forwards: Dict[str, str] = {}
+        for row_key in table.rows.keys():
+            row_data = table.get_row(row_key)
+            local_port, forward_host, forward_port = row_data
+
+            if not local_port:
+                continue
+            try:
+                int(local_port)
+            except ValueError:
+                self.notify("Invalid local port", severity="error", timeout=0.2)
+                continue
+
+            if not forward_port:
+                continue
+            try:
+                int(forward_port)
+            except ValueError:
+                self.notify("Invalid forward port", severity="error", timeout=0.2)
+                continue
+
+            if not all(row_data):
+                continue
+
+            local_forwards[local_port] = f"{forward_host}:{forward_port}"
+
+        if local_forwards != self.host_config.local_forwards:
+            print(f"[INFO] Old host configs: {self.host_config.local_forwards}")
+            print(f"[INFO] New host configs: {local_forwards}")
+            print("[INFO] Host configs have changed, updating host config")
+            self.host_config.local_forwards = local_forwards
+            connection = create_persistent_ssh_connection(self.host_config)
 
     @on(Button.Pressed, "#new_shell")
     def new_shell(self) -> None:

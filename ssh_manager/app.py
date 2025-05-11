@@ -33,8 +33,8 @@ class SSHManagerApp(App):
 
     def on_key(self, event: events.Key) -> None:
         """处理按键事件"""
-        print(f"[DEBUG] Key pressed: {event.key}")
-        if event.key == "enter":
+        print(f"[DEBUG] Main App Detect Key pressed: {event.key}")
+        if event.key == "enter" and self.screen_stack[-1] == self.main_screen:
             self.action_connect()
     
         

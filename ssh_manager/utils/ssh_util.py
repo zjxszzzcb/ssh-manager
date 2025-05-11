@@ -2,17 +2,15 @@ import subprocess
 import time
 import uuid
 import threading
-from typing import List
+from typing import Dict, Optional
 from ssh_manager.utils.ssh_configs import HostConfig
 
 
-_PERSISTENT_SSH_CONNECTIONS = {}
-
-
 class SSHConnection(subprocess.Popen):
-    def __init__(self, commands: List[str], **kwargs):
+    def __init__(self, host_config: HostConfig, **kwargs):
+        print(f"[INFO] Creating SSH connection using command: {host_config.get_ssh_command()}")
         super().__init__(
-            args=commands,
+            args=host_config.get_ssh_command(),
             stdin=subprocess.PIPE,
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
@@ -23,6 +21,8 @@ class SSHConnection(subprocess.Popen):
         self._running = True
         self.daemon_thread = threading.Thread(target=self.keep_alive, daemon=True)
         self.daemon_thread.start()
+
+        self.host_config = host_config
         
 
     def keep_alive(self):
@@ -38,7 +38,6 @@ class SSHConnection(subprocess.Popen):
                     break
                 if flag in content:
                     break
-                print(content)
             except (IOError, ValueError):  # 管道已关闭
                 break
         
@@ -50,7 +49,6 @@ class SSHConnection(subprocess.Popen):
                 output = self.stdout.readline()
                 if not output:  # EOF reached
                     break
-                print(output)
                 time.sleep(3)
             except (IOError, ValueError):  # 管道已关闭
                 break
@@ -65,22 +63,29 @@ class SSHConnection(subprocess.Popen):
 
     def is_alive(self):
         return self.poll() is None and self.available
+    
+    def add_local_forward(self, local_port: int, forward_host: str, forward_port: int):
+        self.host_config.local_forwards[local_port] = f"{forward_host}:{forward_port}"
+        create_persistent_ssh_connection(self.host_config)
+    
 
-def create_persistent_ssh_connection(host_config: HostConfig):
+_PERSISTENT_SSH_CONNECTIONS: Dict[str, SSHConnection] = {}
+
+
+def create_persistent_ssh_connection(host_config: HostConfig) -> SSHConnection:
     """创建持久化SSH连接
     
     Args:
         host_config: 主机配置
     """
-    ssh_command = host_config.get_ssh_command()
-    ssh_process = SSHConnection(ssh_command)
+    ssh_connection = SSHConnection(host_config)
 
     if _PERSISTENT_SSH_CONNECTIONS.get(host_config.host):
         _PERSISTENT_SSH_CONNECTIONS[host_config.host].terminate()
     
-    _PERSISTENT_SSH_CONNECTIONS[host_config.host] = ssh_process
+    _PERSISTENT_SSH_CONNECTIONS[host_config.host] = ssh_connection
 
-    return ssh_process
+    return ssh_connection
 
 
 def close_persistent_ssh_connection(host_config: HostConfig):
@@ -93,7 +98,7 @@ def close_persistent_ssh_connection(host_config: HostConfig):
         _PERSISTENT_SSH_CONNECTIONS.pop(host_config.host).terminate()
 
 
-def get_connection(host: str):
+def get_ssh_connection(host: str) -> Optional[SSHConnection]:
     return _PERSISTENT_SSH_CONNECTIONS.get(host)
 
 
