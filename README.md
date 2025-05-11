@@ -5,7 +5,7 @@ SSH Manager is an easy-to-use SSH connection management tool that helps you effi
 ## Install
 
 ```bash
-pip install -e git+https://github.com/zjxszzzcb/ssh-manager.git@dev
+pip install git+https://github.com/zjxszzzcb/ssh-manager.git@dev
 ```
 
 ## Features
