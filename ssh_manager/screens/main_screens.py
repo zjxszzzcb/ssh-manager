@@ -14,7 +14,7 @@ from ssh_manager.utils.ssh_configs import (
 )
 from ssh_manager.utils.ssh_util import SSHConnection, create_persistent_ssh_connection
 from ssh_manager.utils.terminal_util import open_new_terminal
-from ssh_manager.ui.ssh_conn_ui import SSHConnUI
+from ssh_manager.screens.ssh_conn_screens import SSHConnUI
 
 
 class SSHManagerMainUI(App):

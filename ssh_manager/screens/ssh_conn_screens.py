@@ -30,7 +30,8 @@ def view_ssh_conn_ui():
     from textual.app import App
     
     class TestApp(App):
-        def compose(self) -> ComposeResult:
+        
+        def on_mount(self):
             host_config = HostConfig(
                 host="demo-server-1",
                 hostname="server1.example.com",
@@ -41,7 +42,9 @@ def view_ssh_conn_ui():
                     "80": "example2.com:443",
                 }
             )
-            yield SSHConnUI(host_config)
+            self.install_screen(SSHConnUI(host_config), name="ssh_conn")
+            # 安装完屏幕后，需要推送屏幕使其显示
+            self.push_screen("ssh_conn")
 
     app = TestApp()
     app.run()

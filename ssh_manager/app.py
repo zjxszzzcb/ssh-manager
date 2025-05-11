@@ -1,5 +1,5 @@
 import argparse
-from ssh_manager.ui.main_ui import SSHManagerMainUI
+from ssh_manager.screens.main_screens import SSHManagerMainUI
 from ssh_manager.utils.ssh_configs import load_ssh_config_file, update_ssh_config, load_known_ssh_hosts
 
 def main():
