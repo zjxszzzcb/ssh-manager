@@ -42,7 +42,6 @@ mssh
 
 * Connection Management TUI
     * Upload SSH key to remote host
-    * Configure and manage proxy forwarding
     * Open remote folder in SFTP
     * Edit remote files with TUI editor
     * Proxy/Jump host configuration
