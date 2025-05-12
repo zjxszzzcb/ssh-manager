@@ -11,8 +11,8 @@ dependencies = [
     "textual",
     "textual-dev",
     "asyncssh",
-    "paramiko"
-    "pydantic"
+    "paramiko",
+    "pydantic",
 ]
 
 [project.scripts]
