@@ -103,8 +103,16 @@ def get_ssh_connection(host: str) -> Optional[SSHConnection]:
 
 
 if __name__ == "__main__":
-    ssh_process = SSHConnection(["ssh", "jetson", "-L", "75:localhost:8000", "-t"])
+    # ssh_process = SSHConnection(["ssh", "jetson", "-L", "75:localhost:8000", "-t"])
 
-    while ssh_process.is_alive():
-        # print("Alive")
-        time.sleep(1)
+    # while ssh_process.is_alive():
+    #     # print("Alive")
+    #     time.sleep(1)
+
+    from paramiko.client import SSHClient
+    client = SSHClient()
+    client.load_system_host_keys()
+    client.connect(hostname='192.168.31.100', username='zzzcb')
+    print(client.invoke_shell())
+    # stdin, stdout, stderr = client.exec_command('ls -l')
+    # print(stdout.read().decode())

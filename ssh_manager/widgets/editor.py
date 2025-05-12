@@ -8,13 +8,16 @@ from textual.coordinate import Coordinate
 from ssh_manager.utils.ssh_configs import HostConfig
 
 class HostConfigEditor(TextArea):
-    def __init__(self, host_config: HostConfig, **kwargs):
-        text = self.config_to_text(host_config)
+    def __init__(self, host_config: HostConfig | None, **kwargs):
+        text = self.config_to_text(host_config) if host_config else ""
         super().__init__(text, tab_behavior="indent", **kwargs)
 
 
     @staticmethod
-    def config_to_text(host_config: HostConfig) -> str:
+    def config_to_text(host_config: HostConfig | None) -> str:
+        if not host_config:
+            return ""
+            
         indent = " " * 4
 
         text_items = [

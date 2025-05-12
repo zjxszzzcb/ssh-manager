@@ -80,8 +80,8 @@ class SSHManageMainScreen(Screen):
     }
     """
 
-    def __init__(self, host_configs: List[HostConfig]):
-        self.host_configs = host_configs
+    def __init__(self, host_configs: List[HostConfig] | None = None):
+        self.host_configs = host_configs if host_configs is not None else []
         self.connections: Dict[str, SSHConnection] = dict()
         super().__init__()
 
@@ -104,19 +104,21 @@ class SSHManageMainScreen(Screen):
     def on_mount(self) -> None:
         """当应用挂载完成后添加列表项"""
         list_view = self.query_one(ListView)
-        for config in self.host_configs:
-            list_view.append(HostListItem(config))
+        
+        # 添加主机列表项
+        if self.host_configs:
+            for config in self.host_configs:
+                list_view.append(HostListItem(config))
 
-        # 设置初始焦点到列表视图并选中第一项
-        list_view.focus()
-        if len(list_view.children) > 0:
+            # 设置初始焦点到列表视图并选中第一项
+            list_view.focus()
             list_view.index = 0
             self.update_editor(list_view.children[0])
 
         # 设置定时器每秒更新一次连接状态
         self.set_interval(1.0, self.update_connection_status)
 
-    def update_editor(self, host_item: Widget) -> None:
+    def update_editor(self, host_item: Widget | None) -> None:
         """更新编辑器内容"""
         if isinstance(host_item, HostListItem):
             editor = self.query_one(HostConfigEditor)
