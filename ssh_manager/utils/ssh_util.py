@@ -2,12 +2,57 @@ import subprocess
 import time
 import uuid
 import threading
+import os
+from paramiko.client import SSHClient
 from typing import Dict, Optional
+
 from ssh_manager.utils.ssh_configs import HostConfig
+
+
+def load_public_key():
+    public_key_file = os.path.expanduser("~/.ssh/id_rsa.pub")
+    if not os.path.exists(public_key_file):
+        pass
+    with open(public_key_file, "r") as f:
+        return f.read()
+
+
+def load_private_key():
+    private_key_file = os.path.expanduser("~/.ssh/id_rsa")
+    if not os.path.exists(private_key_file):
+        pass
+    with open(private_key_file, "r") as f:
+        return f.read()
 
 
 class SSHConnection(subprocess.Popen):
     def __init__(self, host_config: HostConfig, **kwargs):
+        self.client = SSHClient()
+        try:
+            self.client.load_system_host_keys()
+            self.client.connect(
+                hostname=host_config.hostname,
+                username=host_config.user,
+                port=host_config.port,
+                auth_timeout=1
+            )
+        except Exception:
+            print(f"[WARNING] Faild to connect {host_config.user}@{host_config.hostname}:{host_config.port}"
+                  f"Try to use password.")
+            self.client.connect(
+                hostname=host_config.hostname,
+                username=host_config.user,
+                password=host_config.password,
+                port=host_config.port
+            )
+            print("[INFO] Upload ssh public key")
+            stdin, stdout, stderr = self.client.exec_command(
+                f"echo \"\n{load_public_key()}\" >> ~/.ssh/authorized_keys"
+            )
+            print(stdout.read())
+            print(stderr.read())
+            print("[INFO] Successfully to upload ssh public key")
+
         print(f"[INFO] Creating SSH connection using command: {host_config.get_ssh_command()}")
         super().__init__(
             args=host_config.get_ssh_command(),
@@ -23,7 +68,6 @@ class SSHConnection(subprocess.Popen):
         self.daemon_thread.start()
 
         self.host_config = host_config
-        
 
     def keep_alive(self):
         flag = str(uuid.uuid4())
@@ -64,10 +108,10 @@ class SSHConnection(subprocess.Popen):
     def is_alive(self):
         return self.poll() is None and self.available
     
-    def add_local_forward(self, local_port: int, forward_host: str, forward_port: int):
+    def add_local_forward(self, local_port: str, forward_host: str, forward_port: int):
         self.host_config.local_forwards[local_port] = f"{forward_host}:{forward_port}"
         create_persistent_ssh_connection(self.host_config)
-    
+
 
 _PERSISTENT_SSH_CONNECTIONS: Dict[str, SSHConnection] = {}
 
@@ -103,16 +147,18 @@ def get_ssh_connection(host: str) -> Optional[SSHConnection]:
 
 
 if __name__ == "__main__":
-    # ssh_process = SSHConnection(["ssh", "jetson", "-L", "75:localhost:8000", "-t"])
+    ssh_process = SSHConnection(HostConfig(host='ucloud', hostname='118.194.255.34', user='ubuntu', password='731008'))
 
-    # while ssh_process.is_alive():
-    #     # print("Alive")
-    #     time.sleep(1)
+    time.sleep(10)
 
-    from paramiko.client import SSHClient
-    client = SSHClient()
-    client.load_system_host_keys()
-    client.connect(hostname='192.168.31.100', username='zzzcb')
-    print(client.invoke_shell())
+    while ssh_process.is_alive():
+        print("Alive")
+        time.sleep(1)
+
+    # client = SSHClient()
+    # client.load_system_host_keys()
+    # print(client.get_host_keys()['192.168.31.100'])
+    # client.connect(hostname='192.168.31.100', username='zzzcb')
     # stdin, stdout, stderr = client.exec_command('ls -l')
     # print(stdout.read().decode())
+    
