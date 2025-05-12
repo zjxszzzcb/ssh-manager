@@ -39,9 +39,10 @@ class SSHManagerApp(App):
     
         
     def action_connect(self) -> None:
-        if self.main_screen.create_connection():
-            host_config = self.main_screen.get_selected_host_config()
-            self.push_screen(SSHConnScreen(host_config))
+        with self.suspend() as suspended_screen:
+            if self.main_screen.create_connection():
+                host_config = self.main_screen.get_selected_host_config()
+                self.push_screen(SSHConnScreen(host_config))
 
 
     def action_quit(self) -> None:

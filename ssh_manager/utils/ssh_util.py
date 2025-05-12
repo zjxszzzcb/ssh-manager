@@ -28,6 +28,7 @@ def load_private_key():
 class SSHConnection(subprocess.Popen):
     def __init__(self, host_config: HostConfig, **kwargs):
         self.client = SSHClient()
+        print(f"[DEBUG] Executing command: {host_config.get_ssh_command()}")
         try:
             self.client.load_system_host_keys()
             self.client.connect(
@@ -67,6 +68,14 @@ class SSHConnection(subprocess.Popen):
         self.daemon_thread = threading.Thread(target=self.keep_alive, daemon=True)
         self.daemon_thread.start()
 
+        # 等待加载完成，最大10秒
+        for _ in range(100):
+            if self.available:
+                break
+            time.sleep(0.1)
+        else:
+            raise TimeoutError("Failed to create ssh connection")
+
         self.host_config = host_config
 
     def keep_alive(self):
@@ -74,10 +83,10 @@ class SSHConnection(subprocess.Popen):
         command = f'echo "{flag}"\n'
         self.stdin.write(command)
         self.stdin.flush()
-        time.sleep(5)
         while self._running:
             try:
                 content = self.stdout.readline()
+                print(content)
                 if not content:  # EOF reached
                     break
                 if flag in content:
