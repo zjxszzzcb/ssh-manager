@@ -5,7 +5,7 @@ SSH Manager is an easy-to-use SSH connection management tool that helps you effi
 ## Install
 
 ```bash
-pip install -e git+https://github.com/zjxszzzcb/ssh-manager.git@dev
+pip install git+https://github.com/zjxszzzcb/ssh-manager.git@dev
 ```
 
 ## Features
@@ -42,7 +42,6 @@ mssh
 
 * Connection Management TUI
     * Upload SSH key to remote host
-    * Configure and manage proxy forwarding
     * Open remote folder in SFTP
     * Edit remote files with TUI editor
     * Proxy/Jump host configuration
