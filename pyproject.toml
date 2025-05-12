@@ -9,7 +9,7 @@ description = "manage ssh"
 
 dependencies = [
     "textual",
-    "textual-dev"
+    "textual-dev",
     "asyncssh",
     "paramiko"
     "pydantic"
