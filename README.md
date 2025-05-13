@@ -18,8 +18,21 @@ mssh --init
 
 ### Run TUI
 
-```
+```bash
 mssh
+```
+
+### Run TUI With Command
+
+```bash
+mssh ssh {user}@{hostname} 
+
+mssh ssh {host}
+
+# Optional args
+-p, --port {port}
+--passowrd {password}
+-L {local_forward}  # Format: local_port:forward_host:forward_port
 ```
 
 ![main](sources/images/main_screen.png)
