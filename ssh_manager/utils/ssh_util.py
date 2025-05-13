@@ -1,8 +1,9 @@
 import subprocess
+import threading
 import time
 import uuid
-import threading
 import os
+
 from paramiko.client import SSHClient
 from typing import Dict, Optional
 
@@ -78,6 +79,14 @@ class SSHConnection(subprocess.Popen):
 
         self.host_config = host_config
 
+    def add_local_forward(self, local_port: str, forward_host: str, forward_port: int):
+        self.host_config.local_forwards[local_port] = f"{forward_host}:{forward_port}"
+        create_persistent_ssh_connection(self.host_config)
+
+    def exec_command(self, command: str) -> str:
+        stdin, stdout, stderr = self.client.exec_command(command)
+        return stdout.read().decode(encoding="utf-8") + stderr.read().decode(encoding="utf-8")
+
     def keep_alive(self):
         flag = str(uuid.uuid4())
         command = f'echo "{flag}"\n'
@@ -116,10 +125,6 @@ class SSHConnection(subprocess.Popen):
 
     def is_alive(self):
         return self.poll() is None and self.available
-    
-    def add_local_forward(self, local_port: str, forward_host: str, forward_port: int):
-        self.host_config.local_forwards[local_port] = f"{forward_host}:{forward_port}"
-        create_persistent_ssh_connection(self.host_config)
 
 
 _PERSISTENT_SSH_CONNECTIONS: Dict[str, SSHConnection] = {}

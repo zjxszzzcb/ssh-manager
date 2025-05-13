@@ -1,8 +1,10 @@
+import argparse
 import os
 import json
 import uuid
+
 from pydantic import BaseModel
-from typing import Dict, List, Optional
+from typing import Any, Dict, List, Optional, Sequence
 
 
 class HostConfig(BaseModel):
@@ -30,6 +32,7 @@ class HostConfig(BaseModel):
 _DEFAULT_SSH_CONFIG_FILE = os.path.expanduser("~/.ssh/config")
 _KNOWN_SSH_HOSTS_FILE = os.path.join(os.path.dirname(__file__), "known_ssh_hosts.json")
 _KNOWN_SSH_HOSTS: Dict[str, HostConfig] = {}
+
 
 def get_ssh_config_example() -> HostConfig:
     return HostConfig(
@@ -76,12 +79,13 @@ def load_ssh_config_file(file_path: str = _DEFAULT_SSH_CONFIG_FILE) -> Dict[str,
 
     return host_configs
 
+
 def parse_text_to_configs(text: str) -> Dict[str, HostConfig]:
     text_lines = text.splitlines()
 
     all_configs: Dict[str, Dict[str, str]] = {}
     current_host = None
-    current_config = {}
+    current_config: Dict[str, Any] = dict()
 
     for line in text_lines:
         line = line.strip()
@@ -144,6 +148,67 @@ def load_known_ssh_hosts() -> Dict[str, HostConfig]:
     _KNOWN_SSH_HOSTS.update({config["host"]: HostConfig(**config) for config in data})
     
     return _KNOWN_SSH_HOSTS
+
+
+def parse_ssh_command(args: Sequence[str]) -> Optional[HostConfig]:
+    parser = argparse.ArgumentParser(description="SSH Command Parser")
+    parser.add_argument("command", choices=['ssh'])
+    parser.add_argument("host")
+    parser.add_argument("-L", nargs="*", default=[], dest='local_forwards')
+
+    parser.add_argument("-p", "--port", type=int, required=False, default=22)
+    parser.add_argument("--password", type=str, required=False, default=None)
+    parser.add_argument("-n", "--name", type=str, required=False, default="")
+
+    try:
+        args, unkargs = parser.parse_known_args(args)
+    except SystemExit:
+        return None
+
+    host_configs_map = load_known_ssh_hosts()
+
+    if '@' in args.host:
+        user, hostname = args.host.split("@")
+        host = args.name or hostname
+    else:
+        user = ""
+        host = hostname = args.host
+
+    known_host_config = host_configs_map.get(host)
+
+    if not user:
+        if known_host_config:
+            return known_host_config
+
+        host_configs_map.update(load_ssh_config_file())
+        return host_configs_map.get(host)
+
+    local_forwards = {}
+    for local_forward in args.local_forwards:
+        local_port, forward_host, forward_port = local_forward.split(":")
+
+        if not all([local_port, forward_host, forward_port]):
+            print(f'Error LocalForward: {local_forward}')
+            continue
+
+        local_forwards[local_port] = f"{forward_host}:{forward_port}"
+
+    host_config = HostConfig(
+        host=host,
+        hostname=hostname,
+        user=user,
+        port=args.port,
+        password=args.password,
+        local_forwards=local_forwards
+    )
+
+    if known_host_config:
+        new_config = known_host_config.model_dump()
+        new_config.update(host_config.model_dump())
+        return HostConfig(**new_config)
+    else:
+        return host_config
+
 
 if __name__ == "__main__":
     print(load_ssh_config_file()['zzzcb-ubuntu'].get_ssh_command())
