@@ -1,17 +1,13 @@
 import argparse
 
 from textual import events
-from textual.app import App, ComposeResult
+from textual.app import App
 from textual.binding import Binding
-
-from typing import List
-
-from ssh_manager.utils.ssh_configs import HostConfig
+from typing import List, Sequence
 
 from ssh_manager.screens.main_screens import SSHManageMainScreen
 from ssh_manager.screens.ssh_conn_screens import SSHConnScreen
-from ssh_manager.utils.ssh_util import SSHConnection
-from ssh_manager.utils.ssh_configs import load_ssh_config_file, update_ssh_config, load_known_ssh_hosts
+from ssh_manager.utils.ssh_configs import HostConfig, load_ssh_config_file, update_ssh_config, load_known_ssh_hosts
 
 class SSHManagerApp(App):
 
@@ -39,7 +35,7 @@ class SSHManagerApp(App):
     
         
     def action_connect(self) -> None:
-        with self.suspend() as suspended_screen:
+        with self.suspend():
             if self.main_screen.create_connection():
                 host_config = self.main_screen.get_selected_host_config()
                 self.push_screen(SSHConnScreen(host_config))
@@ -53,11 +49,66 @@ class SSHManagerApp(App):
                 self.main_screen.cleanup_connections()
                 self.exit()
 
+def parse_ssh_config(args: Sequence[str]):
+    parser = argparse.ArgumentParser(description="SSH Command Parser")
+    parser.add_argument("command", choices=['ssh'])
+    parser.add_argument("host")
+    parser.add_argument("-L", nargs="*", default=[], dest='local_forwards')
+
+    parser.add_argument("-p", "--port", type=int, required=False, default=22)
+    parser.add_argument("--password", type=str, required=False, default=None)
+    parser.add_argument("-n", "--name", type=str, required=False, default="")
+
+    args, unkargs = parser.parse_known_args(args)
+
+    host_configs_map = load_known_ssh_hosts()
+
+    if '@' in args.host:
+        user, hostname = args.host.split("@")
+        host = args.name or hostname
+    else:
+        user = ""
+        host = hostname = args.host
+
+    known_host_config = host_configs_map.get(host)
+
+    if not user:
+        if known_host_config:
+            return known_host_config
+        
+        host_configs_map.update(load_ssh_config_file())
+        return host_configs_map.get(host)
+    
+    local_forwards = {}
+    for local_forward in args.local_forwards:
+        local_port, forward_host, forward_port = local_forward.split(":")
+        
+        if not all([local_port, forward_host, forward_port]):
+            print(f'Error LocalForward: {local_forward}')
+            continue
+            
+        local_forwards[local_port] = f"{forward_host}:{forward_port}"
+    
+    host_config = HostConfig(
+        host=host,
+        hostname=hostname,
+        user=user,
+        port=args.port,
+        password=args.password,
+        local_forwards=local_forwards
+    )
+
+    if known_host_config:
+        new_config = known_host_config.model_dump()
+        new_config.update(host_config.model_dump())
+        return new_config
+    else:
+        return host_config
 
 def main():
     parser = argparse.ArgumentParser(description="SSH Manager")
     parser.add_argument("--init", action="store_true", help="Initialize SSH config file")
-    args = parser.parse_args()
+    args, unkargs = parser.parse_known_args()
     
     if args.init:
         host_configs_map = load_ssh_config_file()
@@ -67,8 +118,14 @@ def main():
         return
     
     host_configs_map = load_known_ssh_hosts()
+    cmd_host_config = parse_ssh_config(unkargs)
+    if cmd_host_config:
+        update_ssh_config(cmd_host_config)
+        host_configs_map[cmd_host_config.host] = cmd_host_config
+
     host_configs = list(host_configs_map.values())
     app = SSHManagerApp(host_configs)
+
     app.run()
 
 if __name__ == "__main__":
