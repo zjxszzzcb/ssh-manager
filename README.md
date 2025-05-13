@@ -46,18 +46,22 @@ mssh ssh {host}
 ##  TODO LIST
 
 ### SSH Manager
-* Configuration Sync
-    * Export configurations back to ~/.ssh/config
 
-* CLI Features
-    * Full SSH command compatibility
-    * Drop-in replacement for OpenSSH client
+* Confiuguration Backup
+
+* Configuration Sync
+  * Export configurations back to ~/.ssh/config
+  * Edit ~/.ssh directory
 
 * Connection Management TUI
-    * Upload SSH key to remote host
-    * Open remote folder in SFTP
-    * Edit remote files with TUI editor
-    * Proxy/Jump host configuration
+  * manager terminal supports the following commands:
+    * basic systemctl commands
+    * Open remote terminal on existing terminal
+    * Open remote directory, edit remote files with TUI editor
+    * File upload / download.
+    * command completition
+    * add port forward
+  * Proxy/Jump host configuration
 
 ### Docker Manager
 
