@@ -4,7 +4,7 @@ from textual.containers import Horizontal
 from textual.widget import Widget
 from textual.widgets import ListView, Footer
 from textual.binding import Binding
-from typing import Dict, List
+from typing import Dict, List, Optional
 
 from ssh_manager.widgets.editor import HostConfigEditor
 from ssh_manager.widgets.host_list import HostListItem
@@ -80,7 +80,7 @@ class SSHManageMainScreen(Screen):
     }
     """
 
-    def __init__(self, host_configs: List[HostConfig] | None = None):
+    def __init__(self, host_configs: Optional[List[HostConfig]] = None):
         self.host_configs = host_configs if host_configs is not None else []
         self.connections: Dict[str, SSHConnection] = dict()
         super().__init__()
@@ -118,7 +118,7 @@ class SSHManageMainScreen(Screen):
         # 设置定时器每秒更新一次连接状态
         self.set_interval(1.0, self.update_connection_status)
 
-    def update_editor(self, host_item: Widget | None) -> None:
+    def update_editor(self, host_item: Optional[Widget]):
         """更新编辑器内容"""
         if isinstance(host_item, HostListItem):
             editor = self.query_one(HostConfigEditor)
@@ -134,7 +134,7 @@ class SSHManageMainScreen(Screen):
             host_item.host_info.is_alive = is_alive
             host_item.update_status()
     
-    def get_selected_host_config(self) -> HostConfig:
+    def get_selected_host_config(self) -> Optional[HostConfig]:
         if self.query_one(ListView).has_focus:
             return self.host_configs[self.query_one(ListView).index]
         else:

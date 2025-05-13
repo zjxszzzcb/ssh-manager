@@ -5,16 +5,18 @@ from textual.widget import Widget
 from textual.widgets import DataTable, Input, TextArea
 from textual.coordinate import Coordinate
 
+from typing import Optional
+
 from ssh_manager.utils.ssh_configs import HostConfig
 
 class HostConfigEditor(TextArea):
-    def __init__(self, host_config: HostConfig | None, **kwargs):
+    def __init__(self, host_config: Optional[HostConfig]=None, **kwargs):
         text = self.config_to_text(host_config) if host_config else ""
         super().__init__(text, tab_behavior="indent", **kwargs)
 
 
     @staticmethod
-    def config_to_text(host_config: HostConfig | None) -> str:
+    def config_to_text(host_config: Optional[HostConfig]=None) -> str:
         if not host_config:
             return ""
             
@@ -80,7 +82,7 @@ class EditableTableWidget(Widget):
         Binding("ctrl+d", "delete_selected_row", "删除选中行"),
     ]
 
-    def __init__(self, columns: list[str], data: list[list[str]] | None = None, **kwargs) -> None:
+    def __init__(self, columns: list[str], data: Optional[list[list[str]]] = None, **kwargs) -> None:
         super().__init__(**kwargs)
         if not columns:
             raise ValueError("列定义 (columns) 不能为空。")
@@ -90,9 +92,9 @@ class EditableTableWidget(Widget):
         if data:
             self.table_data.extend([list(row) for row in data]) # 数据行
 
-        self._cell_to_edit_coords: Coordinate | None = None
-        self._data_table: DataTable | None = None # 在 compose 中初始化
-        self._edit_input: Input | None = None   # 在 compose 中初始化
+        self._cell_to_edit_coords: Optional[Coordinate] = None
+        self._data_table: Optional[DataTable] = None # 在 compose 中初始化
+        self._edit_input: Optional[Input] = None   # 在 compose 中初始化
 
     def compose(self) -> ComposeResult:
         """创建控件的 UI 布局。"""
