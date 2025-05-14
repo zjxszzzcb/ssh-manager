@@ -1,0 +1,3 @@
+[submodule "vendor/textual-textarea"]
+	path = vendor/textual-textarea
+	url = https://github.com/tconbeer/textual-textarea.git
