@@ -1,8 +1,10 @@
 import argparse
+import logging
 
 from textual import events
 from textual.app import App
 from textual.binding import Binding
+from textual.logging import TextualHandler
 from typing import List
 
 from ssh_manager.screens.main_screens import SSHManageMainScreen
@@ -52,7 +54,11 @@ class SSHManagerApp(App):
 def main():
     parser = argparse.ArgumentParser(description="SSH Manager")
     parser.add_argument("--init", action="store_true", help="Initialize SSH config file")
+    parser.add_argument("--log-level", choices=['debug', 'info', 'warning', 'error'], default="warning")
     args, unkargs = parser.parse_known_args()
+
+    if args.log_level:
+        logging.basicConfig(level=getattr(logging, args.log_level.upper()), handlers=[TextualHandler()])
     
     if args.init:
         host_configs_map = load_ssh_config_file()

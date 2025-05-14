@@ -1,3 +1,4 @@
+import logging
 import os
 import subprocess
 import threading
@@ -30,38 +31,11 @@ def load_private_key():
 
 class SSHConnection(subprocess.Popen):
     def __init__(self, host_config: HostConfig, **kwargs):
-        self.initialize = False
         self.client = SSHClient()
-        print(f"Executing command >> `{' '.join(host_config.get_ssh_command())}`")
-        try:
-            self.client.load_system_host_keys()
-            self.client.connect(
-                hostname=host_config.hostname,
-                username=host_config.user,
-                port=host_config.port,
-                auth_timeout=3,
-            )
-        except AuthenticationException:
-            for _ in range(3):
-                success, password = self.connect_by_password(host_config)
-                if success:
-                    break
-                host_config.password = ""
-            else:
-                print(f"Faild to connect `{host_config.user}@{host_config.hostname}` on port `{host_config.port}`")
-                return
+        self.host_config = host_config
+        self.logger = logging.getLogger(self.host)
 
-            print("[INFO] Uploading SSH public key (~/.ssh/id_rsa.pub)")
-            stdin, stdout, stderr = self.client.exec_command(
-                f"echo \"\n{load_public_key()}\" >> ~/.ssh/authorized_keys"
-            )
-            stdout = stdout.read().decode('utf-8')
-            stderr = stderr.read().decode('utf-8')
-            print(stdout+stderr)
-            if stdout and not stderr:
-                print("[INFO] Successfully to upload ssh public key")
-
-        self.initialize = True
+        self._initialize_client()
 
         print(f"[INFO] Establishing an SSH connection, this requires key-based authentication.")
         super().__init__(
@@ -72,20 +46,54 @@ class SSHConnection(subprocess.Popen):
             text=True,
             **kwargs
         )
-        self.available = False
+        self._available = False
         self._running = True
         self.daemon_thread = threading.Thread(target=self.keep_alive, daemon=True)
         self.daemon_thread.start()
 
         # 等待加载完成，最大10秒
         for _ in range(100):
-            if self.available:
+            if self._available:
                 break
             time.sleep(0.1)
         else:
             raise TimeoutError("Failed to create ssh connection")
 
-        self.host_config = host_config
+    def _initialize_client(self):
+
+        print(f"Executing command >> `{' '.join(self.host_config.get_ssh_command())}`")
+        try:
+            self.client.load_system_host_keys()
+            self.client.connect(
+                hostname=self.host_config.hostname,
+                username=self.host_config.user,
+                port=self.host_config.port,
+                auth_timeout=3,
+            )
+        except AuthenticationException:
+            for _ in range(3):
+                success, password = self.connect_by_password(self.host_config)
+                if success:
+                    break
+                self.host_config.password = ""
+            else:
+                print(f"Faild to connect `{self.host_config.user}@{self.host_config.hostname}` "
+                      f"on port `{self.host_config.port}`")
+                return
+
+            print("[INFO] Uploading SSH public key (~/.ssh/id_rsa.pub)")
+            stdin, stdout, stderr = self.client.exec_command(
+                f"echo \"\n{load_public_key()}\" >> ~/.ssh/authorized_keys"
+            )
+            stdout = stdout.read().decode('utf-8')
+            stderr = stderr.read().decode('utf-8')
+            print(stdout + stderr)
+            if stdout and not stderr:
+                print("[INFO] Successfully to upload ssh public key")
+
+    @property
+    def host(self):
+        return self.host_config.host
 
     def add_local_forward(self, local_port: str, forward_host: str, forward_port: int):
         self.host_config.local_forwards[local_port] = f"{forward_host}:{forward_port}"
@@ -104,14 +112,14 @@ class SSHConnection(subprocess.Popen):
             try:
                 content = self.stdout.readline()
                 print(content)
-                if not content:  # EOF reached
+                if not content:
                     break
                 if flag in content:
                     break
             except (IOError, ValueError):  # 管道已关闭
                 break
         
-        self.available = True
+        self._available = True
         while self._running:
             try:
                 self.stdin.write(command)
@@ -119,20 +127,23 @@ class SSHConnection(subprocess.Popen):
                 output = self.stdout.readline()
                 if not output:  # EOF reached
                     break
+                self.logger.debug(f"pause.")
                 time.sleep(3)
             except (IOError, ValueError):  # 管道已关闭
                 break
-        
-        self.available = False
-        self._running = False
+
+        self.logger.info(f"stop")
+        self._available = False
+        close_persistent_ssh_connection(self.host_config)
 
     def terminate(self) -> None:
         """重写terminate方法以确保守护线程正确退出"""
         self._running = False
         super().terminate()
+        close_persistent_ssh_connection(self.host_config)
 
     def is_alive(self):
-        return self.poll() is None and self.available
+        return self.poll() is None and self._available
 
     def connect_by_password(self, host_config: HostConfig):
         password = host_config.password
