@@ -143,12 +143,19 @@ class SSHManageMainScreen(Screen):
     def create_connection(self) -> bool:
         print("[DEBUG] action_connect triggered")
         host_config = self.get_selected_host_config()
-        if host_config: 
-            print(f"[DEBUG] Creating connection for host: {host_config.host}")
-            self.connections[host_config.host] = create_persistent_ssh_connection(host_config)
-            return True
-        else:
+        if not host_config:
             return False
+
+        print(f"[DEBUG] Creating connection for host: {host_config.host}")
+        with self.app.suspend():
+            connection = create_persistent_ssh_connection(host_config)
+            success = connection is not None
+
+        if connection:
+            self.host_configs[self.host_configs.index(host_config)] = host_config
+            self.connections[host_config.host] = connection
+
+        return success
         
     def cleanup_connections(self):
         for connection in self.connections.values():

@@ -1,10 +1,12 @@
+import os
 import subprocess
 import threading
 import time
+import traceback
 import uuid
-import os
 
 from paramiko.client import SSHClient
+from paramiko.ssh_exception import AuthenticationException
 from typing import Dict, Optional
 
 from ssh_manager.utils.ssh_configs import HostConfig
@@ -28,34 +30,40 @@ def load_private_key():
 
 class SSHConnection(subprocess.Popen):
     def __init__(self, host_config: HostConfig, **kwargs):
+        self.initialize = False
         self.client = SSHClient()
-        print(f"[DEBUG] Executing command: {host_config.get_ssh_command()}")
+        print(f"Executing command >> `{' '.join(host_config.get_ssh_command())}`")
         try:
             self.client.load_system_host_keys()
             self.client.connect(
                 hostname=host_config.hostname,
                 username=host_config.user,
                 port=host_config.port,
-                auth_timeout=1
+                auth_timeout=3,
             )
-        except Exception:
-            print(f"[WARNING] Faild to connect {host_config.user}@{host_config.hostname}:{host_config.port}"
-                  f"Try to use password.")
-            self.client.connect(
-                hostname=host_config.hostname,
-                username=host_config.user,
-                password=host_config.password,
-                port=host_config.port
-            )
-            print("[INFO] Upload ssh public key")
+        except AuthenticationException:
+            for _ in range(3):
+                success, password = self.connect_by_password(host_config)
+                if success:
+                    break
+                host_config.password = ""
+            else:
+                print(f"Faild to connect `{host_config.user}@{host_config.hostname}` on port `{host_config.port}`")
+                return
+
+            print("[INFO] Uploading SSH public key (~/.ssh/id_rsa.pub)")
             stdin, stdout, stderr = self.client.exec_command(
                 f"echo \"\n{load_public_key()}\" >> ~/.ssh/authorized_keys"
             )
-            print(stdout.read())
-            print(stderr.read())
-            print("[INFO] Successfully to upload ssh public key")
+            stdout = stdout.read().decode('utf-8')
+            stderr = stderr.read().decode('utf-8')
+            print(stdout+stderr)
+            if stdout and not stderr:
+                print("[INFO] Successfully to upload ssh public key")
 
-        print(f"[INFO] Creating SSH connection using command: {host_config.get_ssh_command()}")
+        self.initialize = True
+
+        print(f"[INFO] Establishing an SSH connection, this requires key-based authentication.")
         super().__init__(
             args=host_config.get_ssh_command(),
             stdin=subprocess.PIPE,
@@ -126,24 +134,51 @@ class SSHConnection(subprocess.Popen):
     def is_alive(self):
         return self.poll() is None and self.available
 
+    def connect_by_password(self, host_config: HostConfig):
+        password = host_config.password
+        success = False
+        try:
+            if not password:
+                password = input("Password:")
+            self.client.connect(
+                hostname=host_config.hostname,
+                username=host_config.user,
+                password=password,
+                port=host_config.port,
+                auth_timeout=3
+            )
+            success = True
+        except Exception as e:
+            if isinstance(e, AuthenticationException):
+                print("Authentication failed.")
+            else:
+                print(traceback.format_exc())
+            password = ""
+        return success, password
+
 
 _PERSISTENT_SSH_CONNECTIONS: Dict[str, SSHConnection] = {}
 
 
-def create_persistent_ssh_connection(host_config: HostConfig) -> SSHConnection:
+def create_persistent_ssh_connection(host_config: HostConfig) -> Optional[SSHConnection]:
     """创建持久化SSH连接
     
     Args:
         host_config: 主机配置
     """
-    ssh_connection = SSHConnection(host_config)
+    try:
+        ssh_connection = SSHConnection(host_config)
 
-    if _PERSISTENT_SSH_CONNECTIONS.get(host_config.host):
-        _PERSISTENT_SSH_CONNECTIONS[host_config.host].terminate()
+        if _PERSISTENT_SSH_CONNECTIONS.get(host_config.host):
+            _PERSISTENT_SSH_CONNECTIONS[host_config.host].terminate()
     
-    _PERSISTENT_SSH_CONNECTIONS[host_config.host] = ssh_connection
+        _PERSISTENT_SSH_CONNECTIONS[host_config.host] = ssh_connection
 
-    return ssh_connection
+        return ssh_connection
+
+    except (RuntimeError, TimeoutError, KeyboardInterrupt):
+        print(traceback.format_exc())
+        return None
 
 
 def close_persistent_ssh_connection(host_config: HostConfig):

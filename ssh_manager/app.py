@@ -3,7 +3,7 @@ import argparse
 from textual import events
 from textual.app import App
 from textual.binding import Binding
-from typing import List, Sequence
+from typing import List
 
 from ssh_manager.screens.main_screens import SSHManageMainScreen
 from ssh_manager.screens.ssh_conn_screens import SSHConnScreen
@@ -36,10 +36,9 @@ class SSHManagerApp(App):
             self.action_connect()
 
     def action_connect(self) -> None:
-        with self.suspend():
-            if self.main_screen.create_connection():
-                host_config = self.main_screen.get_selected_host_config()
-                self.push_screen(SSHConnScreen(host_config))
+        if self.main_screen.create_connection():
+            host_config = self.main_screen.get_selected_host_config()
+            self.push_screen(SSHConnScreen(host_config))
 
     def action_quit(self) -> None:
         """退出应用，但仅在编辑器没有焦点时生效"""
