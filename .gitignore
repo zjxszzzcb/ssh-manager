@@ -6,4 +6,4 @@ test.py
 
 known_ssh_hosts.json
 
-vendor/
+ssh_manager/vendor/

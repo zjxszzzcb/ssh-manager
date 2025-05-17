@@ -1,42 +1,57 @@
+from rich.console import RenderableType
 from textual import events
 from textual.app import App, ComposeResult
 from textual.binding import Binding
 from textual.widget import Widget
-from textual.widgets import DataTable, Input, TextArea
+from textual.widgets import DataTable, Input
 from textual.coordinate import Coordinate
 
-from typing import Optional
+from typing import Optional, Sequence
 
 from ssh_manager.utils.ssh_configs import HostConfig
+from ssh_manager.vendor.textual_textarea import TextEditor
 
-class HostConfigEditor(TextArea):
+
+def ssh_config_completer(word: str) -> Sequence[tuple[RenderableType, str]]:
+    """SSH 配置补全器"""
+    suggests_map = {
+        'HostN': ('HostName',),
+        'H': ('Host', 'HostName'),
+
+        'Pa': ('Password',),
+        'Po': ('Port',),
+        'P': ('Port', 'Password'),
+
+        'U': ('User',),
+        'L': ('LocalForward',),
+        'R': ('RemoteForward',),
+    }
+
+    for key, values in suggests_map.items():
+        if word.startswith(key):
+            return [(value, value) for value in values]
+    return []
+
+
+class HostConfigEditor(TextEditor, inherit_bindings=False):
+
+    BINDINGS = [
+        Binding("ctrl+s", "save", "Save"),
+    ]
+
     def __init__(self, host_config: Optional[HostConfig]=None, **kwargs):
-        text = self.config_to_text(host_config) if host_config else ""
-        super().__init__(text, tab_behavior="indent", **kwargs)
+        text = host_config.to_text(add_password=True)
+        super().__init__(
+            text=text,
+            word_completer=ssh_config_completer,
+            **kwargs
+        )
 
-
-    @staticmethod
-    def config_to_text(host_config: Optional[HostConfig]=None) -> str:
-        if not host_config:
-            return ""
-            
-        indent = " " * 4
-
-        text_items = [
-            f"Host {host_config.host}\n",
-            f"{indent}Hostname {host_config.hostname}\n",
-            f"{indent}User {host_config.user}\n",
-            f"{indent}Password {host_config.password}\n" if host_config.password else "",
-            f"{indent}Port {host_config.port}\n",
-        ]
-        
-        for local_port, remote_host_port in host_config.local_forwards.items():
-            text_items.append(f"{indent}LocalForward {local_port} {remote_host_port}\n")
-            
-        # for remote_port, local_host_port in host_config.remote_forwards.items():
-        #     text_items.append(f"{indent}RemoteForward {remote_port} {local_host_port}\n")
-        
-        return "".join(text_items)
+    def load_text(self, text: str):
+        self.text = text
+    
+    def has_cursor(self) -> bool:
+        return self.text_input.has_focus
 
 
 class EditableTableWidget(Widget):

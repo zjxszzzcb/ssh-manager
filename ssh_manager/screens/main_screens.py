@@ -33,7 +33,7 @@ class SSHManageMainScreen(Screen):
         
         # 显示编辑器和退出的快捷键提示
         Binding("e", "focus_editor", "Edit", show=True),
-        Binding("escape", "app.quit", "Quit", show=True),
+        Binding("escape", "escape", "Quit", show=True),
         Binding("c", "connect", "Connect", show=True),
         
         # 隐藏其他快捷键提示
@@ -161,7 +161,7 @@ class SSHManageMainScreen(Screen):
         list_view = self.query_one(ListView)
         items = list_view.children
         index = list_view.index
-        if items and 0 < index < len(items):
+        if items and 0 <= index < len(items):
             item = list_view.children[list_view.index]
             assert isinstance(item, HostListItem)
             return item
@@ -243,7 +243,7 @@ class SSHManageMainScreen(Screen):
     def action_save_config(self) -> None:
         """保存当前编辑器中的配置"""
         editor = self.query_one(HostConfigEditor)
-        if editor.has_focus:
+        if editor.has_cursor():
             # 从编辑器文本解析配置
             config = list(parse_text_to_configs(editor.text).values())[0]
             self.update_selected_item(config)
@@ -262,6 +262,14 @@ class SSHManageMainScreen(Screen):
             selected_item.remove()
             self.action_focus_list()
             list_view.index = min(list_view.index, len(list_view.children) - 1)
+    
+    def action_escape(self) -> None:
+        list_view = self.query_one(ListView)
+        editor = self.query_one(HostConfigEditor)
+        if editor.has_focus:
+            list_view.focus()
+        elif list_view.has_focus:
+            self.app.action_quit()
 
 
 def view_main_ui():
