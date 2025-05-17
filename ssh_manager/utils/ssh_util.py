@@ -1,5 +1,6 @@
 import logging
 import os
+import platform
 import subprocess
 import threading
 import time
@@ -178,6 +179,10 @@ def create_persistent_ssh_connection(host_config: HostConfig) -> Optional[SSHCon
         host_config: 主机配置
     """
     try:
+        if platform.system() == "Windows":
+            os.system('cls')
+        else:
+            os.system('clear')
         ssh_connection = SSHConnection(host_config)
 
         if _PERSISTENT_SSH_CONNECTIONS.get(host_config.host):

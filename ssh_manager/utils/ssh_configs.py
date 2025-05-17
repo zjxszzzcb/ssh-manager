@@ -28,6 +28,28 @@ class HostConfig(BaseModel):
         self_config.update(config.model_dump(mode='json'))
         return self.__class__(**self_config)
 
+    def to_text(self, add_password: bool = False) -> str:
+        indent = ' ' * 4
+
+        texts = [
+            f"Host {self.host}\n",
+            f"{indent}HostName {self.hostname}\n",
+            f"{indent}User {self.user}\n",
+            f"{indent}Port {self.port}\n",
+        ]
+
+        if add_password:
+            texts.append(f"{indent}Password {self.password}\n")
+
+        for local_port, remote_host_port in self.local_forwards.items():
+            texts.append(f"{indent}LocalForward {local_port}:{remote_host_port}\n")
+
+        return "".join(texts)
+    
+    @classmethod
+    def from_text(cls, text: str) -> Optional["HostConfig"]:
+        return next(iter(parse_text_to_configs(text).values()), None)
+
 
 _DEFAULT_SSH_CONFIG_FILE = os.path.expanduser("~/.ssh/config")
 _KNOWN_SSH_HOSTS_FILE = os.path.join(os.path.dirname(__file__), "known_ssh_hosts.json")
