@@ -150,8 +150,16 @@ def load_known_ssh_hosts() -> Dict[str, HostConfig]:
     return _KNOWN_SSH_HOSTS
 
 
+class SilentArgumentParser(argparse.ArgumentParser):
+    def error(self, message):
+        raise SystemExit(message)
+
+
 def parse_ssh_command(args: Sequence[str]) -> Optional[HostConfig]:
-    parser = argparse.ArgumentParser(description="SSH Command Parser")
+    parser = SilentArgumentParser(
+        description="SSH Command Parser",
+        exit_on_error=False
+    )
     parser.add_argument("command", choices=['ssh'])
     parser.add_argument("host")
     parser.add_argument("-L", nargs="*", default=[], dest='local_forwards')
