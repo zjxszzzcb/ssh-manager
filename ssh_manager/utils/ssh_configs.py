@@ -241,4 +241,7 @@ def parse_ssh_command(args: Sequence[str]) -> Optional[HostConfig]:
 
 
 if __name__ == "__main__":
-    print(load_ssh_config_file()['zzzcb-ubuntu'].get_ssh_command())
+    a = load_ssh_config_file()['zzzcb-ubuntu']
+    b = load_ssh_config_file()['zzzcb-ubuntu']
+
+    print(a == b)

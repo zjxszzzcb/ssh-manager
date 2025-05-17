@@ -33,12 +33,10 @@ class SSHManageMainScreen(Screen):
         
         # 显示编辑器和退出的快捷键提示
         Binding("e", "focus_editor", "Edit", show=True),
-        Binding("escape", "escape", "Quit", show=True),
         Binding("c", "connect", "Connect", show=True),
         
         # 隐藏其他快捷键提示
-        Binding("ctrl+s", "save_config", "Save config", show=False),
-        Binding("ctrl+c", "quit", "Quit", show=False),
+        Binding("ctrl+s", "save_config", "Save config", show=True),
         Binding("ctrl+d", "delete_config", "Delete config"),
         Binding("ctrl+n", "new_config", "New config"),
     ]
@@ -152,10 +150,8 @@ class SSHManageMainScreen(Screen):
         self.host_configs[list_view.index] = selected_item.host_info
     
     def get_selected_host_config(self) -> Optional[HostConfig]:
-        if self.query_one(ListView).has_focus:
-            return self.host_configs[self.query_one(ListView).index]
-        else:
-            return None
+        selected_item = self.get_selected_item()
+        return selected_item.host_info or None
 
     def get_selected_item(self) -> Optional[HostListItem]:
         list_view = self.query_one(ListView)
@@ -184,8 +180,9 @@ class SSHManageMainScreen(Screen):
             connection = create_persistent_ssh_connection(host_config)
             success = connection is not None
 
+        list_view = self.query_one(ListView)
         if connection:
-            self.host_configs[self.host_configs.index(host_config)] = host_config
+            self.host_configs[list_view.index] = host_config
             self.connections[host_config.host] = connection
 
         return success
@@ -245,10 +242,18 @@ class SSHManageMainScreen(Screen):
         editor = self.query_one(HostConfigEditor)
         if editor.has_cursor():
             # 从编辑器文本解析配置
-            config = list(parse_text_to_configs(editor.text).values())[0]
-            self.update_selected_item(config)
+            selected_config_old = self.get_selected_host_config()
+            new_config = list(parse_text_to_configs(editor.text).values())[0]
+            for known_host_config in self.host_configs:
+                if selected_config_old.to_text(True) == known_host_config.to_text(True):
+                    continue
+                if known_host_config.host == new_config.host:
+                    self.notify(f"Host {known_host_config.host} already exists.", severity="error")
+                    self.update_editor(selected_config_old.to_text(add_password=True))
+                    return
+            self.update_selected_item(new_config)
             # 更新配置
-            update_ssh_config(config)
+            update_ssh_config(new_config)
             # 将焦点移回列表
             self.action_focus_list()
 
@@ -262,14 +267,15 @@ class SSHManageMainScreen(Screen):
             selected_item.remove()
             self.action_focus_list()
             list_view.index = min(list_view.index, len(list_view.children) - 1)
-    
-    def action_escape(self) -> None:
+
+    def quit(self) -> None:
         list_view = self.query_one(ListView)
         editor = self.query_one(HostConfigEditor)
-        if editor.has_focus:
+        if editor.has_cursor():
             list_view.focus()
-        elif list_view.has_focus:
-            self.app.action_quit()
+        else:
+            self.cleanup_connections()
+            self.app.exit()
 
 
 def view_main_ui():

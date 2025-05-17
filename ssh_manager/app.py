@@ -45,10 +45,7 @@ class SSHManagerApp(App):
     def action_quit(self) -> None:
         """退出应用，但仅在编辑器没有焦点时生效"""
         if self.screen_stack[-1] == self.main_screen:
-            editor = self.main_screen.query_one("HostConfigEditor")
-            if not editor.has_focus:
-                self.main_screen.cleanup_connections()
-                self.exit()
+            self.main_screen.quit()
 
 
 def main():
