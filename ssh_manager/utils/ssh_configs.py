@@ -15,12 +15,15 @@ class HostConfig(BaseModel):
     port: int = 22
     local_forwards: Dict[str, str] = {}
     remote_forwards: Dict[str, str] = {}
+    proxy_command: Optional[str] = None
     
     def get_ssh_command(self) -> List[str]:
         connect_commands = ['ssh', '-p', str(self.port), f'{self.user}@{self.hostname}']
         local_forwards_commands = []
         for local_port, remote_host_port in self.local_forwards.items():
             local_forwards_commands.extend(["-L", f"{local_port}:{remote_host_port}"])
+        if self.proxy_command:
+            connect_commands.extend(["-o", f"ProxyCommand={self.proxy_command}"])
         return connect_commands + local_forwards_commands
 
     def update_config(self, config: "HostConfig"):
@@ -43,6 +46,9 @@ class HostConfig(BaseModel):
 
         for local_port, remote_host_port in self.local_forwards.items():
             texts.append(f"{indent}LocalForward {local_port}:{remote_host_port}\n")
+
+        if self.proxy_command:
+            texts.append(f"{indent}ProxyCommand {self.proxy_command}")
 
         return "".join(texts)
     
@@ -141,6 +147,9 @@ def parse_text_to_configs(text: str) -> Dict[str, HostConfig]:
         elif current_host and key == 'remoteforward':
             current_config.setdefault('remote_forwards', dict())
             current_config['remote_forwards'][values[0]] = values[1]
+
+        elif current_host and key == 'proxycommand':
+            current_config['proxy_command'] = " ".join(values)
 
         elif current_host:
             # 添加配置项
@@ -241,7 +250,22 @@ def parse_ssh_command(args: Sequence[str]) -> Optional[HostConfig]:
 
 
 if __name__ == "__main__":
-    a = load_ssh_config_file()['zzzcb-ubuntu']
-    b = load_ssh_config_file()['zzzcb-ubuntu']
+    # print(parse_text_to_configs(
+    #     "Host jetson\n"
+    #     "HostName 192.168.31.100\n"
+    #     "User zzzcb\n"
+    #     "Port 22\n"
+    #     "Password None\n"
+    #     "ProxyCommand ssh -W %h:%p zzzcb-ubuntu\n"
+    # )['jetson'].get_ssh_command())
 
-    print(a == b)
+    from ssh_manager.utils.ssh_util import create_persistent_ssh_connection
+
+    create_persistent_ssh_connection(parse_text_to_configs(
+        "Host jetson\n"
+        "HostName 192.168.31.42\n"
+        "User zzzcb\n"
+        "Port 22\n"
+        "Password None\n"
+        "ProxyCommand ssh -W 192.168.31.42:22 zzzcb-ubuntu\n"
+    )['jetson'])

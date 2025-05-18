@@ -20,6 +20,7 @@ def ssh_config_completer(word: str) -> Sequence[tuple[RenderableType, str]]:
 
         'Pa': ('Password',),
         'Po': ('Port',),
+        'Pr': ('ProxyCommand ssh -W %h:%p',),
         'P': ('Port', 'Password'),
 
         'U': ('User',),
@@ -39,7 +40,7 @@ class HostConfigEditor(TextEditor, inherit_bindings=False):
         Binding("ctrl+s", "save", "Save"),
     ]
 
-    def __init__(self, host_config: Optional[HostConfig]=None, **kwargs):
+    def __init__(self, host_config: Optional[HostConfig] = None, **kwargs):
         text = host_config.to_text(add_password=True)
         super().__init__(
             text=text,
@@ -103,13 +104,13 @@ class EditableTableWidget(Widget):
             raise ValueError("列定义 (columns) 不能为空。")
         
         # 内部数据存储，第一行为表头
-        self.table_data: list[list[str]] = [list(columns)] # 表头
+        self.table_data: list[list[str]] = [list(columns)]          # 表头
         if data:
-            self.table_data.extend([list(row) for row in data]) # 数据行
+            self.table_data.extend([list(row) for row in data])     # 数据行
 
         self._cell_to_edit_coords: Optional[Coordinate] = None
-        self._data_table: Optional[DataTable] = None # 在 compose 中初始化
-        self._edit_input: Optional[Input] = None   # 在 compose 中初始化
+        self._data_table: Optional[DataTable] = None                # 在 compose 中初始化
+        self._edit_input: Optional[Input] = None                    # 在 compose 中初始化
 
     def compose(self) -> ComposeResult:
         """创建控件的 UI 布局。"""
@@ -189,10 +190,10 @@ class EditableTableWidget(Widget):
         if self._cell_to_edit_coords:
             new_value = self._edit_input.value
             
-            table_row_idx = self._cell_to_edit_coords.row # DataTable 中的视觉行索引
+            table_row_idx = self._cell_to_edit_coords.row   # DataTable 中的视觉行索引
             table_col_idx = self._cell_to_edit_coords.column
 
-            source_data_row_idx = table_row_idx + 1 # 对应 self.table_data 的行索引
+            source_data_row_idx = table_row_idx + 1     # 对应 self.table_data 的行索引
 
             if 0 <= source_data_row_idx < len(self.table_data) and \
                0 <= table_col_idx < len(self.table_data[source_data_row_idx]):
@@ -204,17 +205,17 @@ class EditableTableWidget(Widget):
             self._data_table.focus()
             self._cell_to_edit_coords = None
         else:
-            self._edit_input.remove_class("visible") # 预防性隐藏
+            self._edit_input.remove_class("visible")    # 预防性隐藏
             self._data_table.focus()
 
     def action_add_new_row(self) -> None:
         """添加一个新行到表格中。"""
         assert self._data_table is not None
         
-        num_columns = len(self.table_data[0]) # 基于表头获取列数
-        new_data_row_values = [""] * num_columns # 创建空字符串列表作为新行数据
+        num_columns = len(self.table_data[0])   # 基于表头获取列数
+        new_data_row_values = [""] * num_columns    # 创建空字符串列表作为新行数据
         
-        self.table_data.append(list(new_data_row_values)) # 添加到内部数据源
+        self.table_data.append(list(new_data_row_values))   # 添加到内部数据源
         
         # DataTable 会自动为没有提供 key 的行生成唯一的键
         self._data_table.add_row(*new_data_row_values) 
@@ -225,18 +226,18 @@ class EditableTableWidget(Widget):
         if new_row_index >= 0:
             self._data_table.cursor_coordinate = Coordinate(new_row_index, 0)
             # 移除了显式的 scroll_to_coordinate 调用
-        self.app.bell() # 发出提示音
+        self.app.bell()     # 发出提示音
 
     def action_delete_selected_row(self) -> None:
         """删除当前选中的行。"""
         assert self._data_table is not None
         assert self._edit_input is not None
 
-        cursor_row_idx = self._data_table.cursor_row # 获取 DataTable 中的视觉行索引
+        cursor_row_idx = self._data_table.cursor_row    # 获取 DataTable 中的视觉行索引
 
         # 检查是否有有效的行被选中
         if cursor_row_idx < 0 or cursor_row_idx >= self._data_table.row_count:
-            self.app.bell() # 无有效行选中，发出提示音
+            self.app.bell()     # 无有效行选中，发出提示音
             return
 
         # 如果正在编辑的单元格位于要删除的行中，则取消编辑
@@ -260,13 +261,13 @@ class EditableTableWidget(Widget):
                 if not (0 <= current_col_cursor < len(self._data_table.columns)):
                     current_col_cursor = 0
                 
-                if len(self._data_table.columns) > 0 :
-                     self._data_table.cursor_coordinate = Coordinate(new_cursor_row, current_col_cursor)
+                if len(self._data_table.columns) > 0:
+                    self._data_table.cursor_coordinate = Coordinate(new_cursor_row, current_col_cursor)
                 else:
-                     self._data_table.cursor_coordinate = Coordinate(new_cursor_row, 0)
+                    self._data_table.cursor_coordinate = Coordinate(new_cursor_row, 0)
                 # 移除了显式的 scroll_to_coordinate 调用
-            else: # 如果表格变空了
-                pass # 不需要设置光标
+            else:   # 如果表格变空了
+                pass    # 不需要设置光标
 
             self._data_table.focus() 
             self.app.bell()
@@ -315,6 +316,7 @@ def view_host_config_editor():
 
     app = TextAreaExample()
     app.run()
+
 
 if __name__ == "__main__":
     view_host_config_editor()

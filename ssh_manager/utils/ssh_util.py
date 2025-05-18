@@ -7,6 +7,7 @@ import time
 import traceback
 import uuid
 
+import paramiko
 from paramiko.client import SSHClient
 from paramiko.ssh_exception import AuthenticationException
 from typing import Dict, Optional
@@ -64,11 +65,16 @@ class SSHConnection(subprocess.Popen):
 
         print(f"Executing command >> `{' '.join(self.host_config.get_ssh_command())}`")
         try:
+            if self.host_config.proxy_command:
+                proxy_command = paramiko.ProxyCommand(self.host_config.proxy_command)
+            else:
+                proxy_command = None
             self.client.load_system_host_keys()
             self.client.connect(
                 hostname=self.host_config.hostname,
                 username=self.host_config.user,
                 port=self.host_config.port,
+                sock=proxy_command,
                 auth_timeout=3,
             )
         except AuthenticationException:
