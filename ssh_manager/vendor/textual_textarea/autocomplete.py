@@ -13,7 +13,7 @@ from textual.message import Message
 from textual.reactive import Reactive, reactive
 from textual.widget import Widget
 from textual.widgets import OptionList
-from textual.widgets._option_list import NewOptionListContent
+from textual.widgets._option_list import OptionListContent
 from textual.widgets.option_list import Option
 
 from .messages import TextAreaHideCompletionList
@@ -71,14 +71,14 @@ class CompletionList(OptionList, can_focus=False, inherit_bindings=False):
 
     def __init__(
         self,
-        *content: NewOptionListContent,
+        *content: OptionListContent,
         name: str | None = None,
         id: str | None = None,  # noqa: A002
         classes: str | None = None,
         disabled: bool = False,
     ):
         super().__init__(
-            *content, name=name, id=id, classes=classes, disabled=disabled, wrap=False
+            *content, name=name, id=id, classes=classes, disabled=disabled
         )
 
     def set_offset(self, x_offset: int, y_offset: int) -> None:
@@ -187,7 +187,7 @@ class CompletionList(OptionList, can_focus=False, inherit_bindings=False):
                 self.y_offset,
             )
 
-        self.add_options(items=items)
+        self.add_options(items)
         self.action_first()
         self.additional_x_offset = additional_x_offset
         self.is_open = True

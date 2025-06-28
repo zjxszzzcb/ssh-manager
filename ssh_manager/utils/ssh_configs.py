@@ -57,9 +57,9 @@ class HostConfig(BaseModel):
         return next(iter(parse_text_to_configs(text).values()), None)
 
 
-_DEFAULT_SSH_CONFIG_FILE = os.path.expanduser("~/.ssh/config")
-_KNOWN_SSH_HOSTS_FILE = os.path.join(os.path.dirname(__file__), "known_ssh_hosts.json")
-_KNOWN_SSH_HOSTS: Dict[str, HostConfig] = {}
+DEFAULT_SSH_CONFIG_FILE = os.path.expanduser("~/.ssh/config")
+KNOWN_SSH_HOSTS_FILE = os.path.join(os.path.dirname(__file__), "known_ssh_hosts.json")
+KNOWN_SSH_HOSTS: Dict[str, HostConfig] = {}
 
 
 def get_ssh_config_example() -> HostConfig:
@@ -73,22 +73,22 @@ def get_ssh_config_example() -> HostConfig:
 
 
 def get_ssh_config(host: str) -> Optional[HostConfig]:
-    return _KNOWN_SSH_HOSTS.get(host)
+    return KNOWN_SSH_HOSTS.get(host)
 
 
 def update_ssh_config(config: HostConfig):
-    _KNOWN_SSH_HOSTS[config.host] = config
-    with open(_KNOWN_SSH_HOSTS_FILE, "w", encoding="utf-8") as f:
-        f.write(json.dumps([config.model_dump() for config in _KNOWN_SSH_HOSTS.values()]))
+    KNOWN_SSH_HOSTS[config.host] = config
+    with open(KNOWN_SSH_HOSTS_FILE, "w", encoding="utf-8") as f:
+        f.write(json.dumps([config.model_dump() for config in KNOWN_SSH_HOSTS.values()]))
 
 
 def delete_ssh_config(host: str):
-    _KNOWN_SSH_HOSTS.pop(host)
-    with open(_KNOWN_SSH_HOSTS_FILE, "w", encoding="utf-8") as f:
-        f.write(json.dumps([config.model_dump() for config in _KNOWN_SSH_HOSTS.values()]))
+    KNOWN_SSH_HOSTS.pop(host)
+    with open(KNOWN_SSH_HOSTS_FILE, "w", encoding="utf-8") as f:
+        f.write(json.dumps([config.model_dump() for config in KNOWN_SSH_HOSTS.values()]))
 
 
-def load_ssh_config_file(file_path: str = _DEFAULT_SSH_CONFIG_FILE) -> Dict[str, HostConfig]:
+def load_ssh_config_file(file_path: str = DEFAULT_SSH_CONFIG_FILE) -> Dict[str, HostConfig]:
     """从SSH配置文件加载主机配置
 
     Args:
@@ -170,15 +170,15 @@ def parse_text_to_configs(text: str) -> Dict[str, HostConfig]:
 
 
 def load_known_ssh_hosts() -> Dict[str, HostConfig]:
-    if not os.path.exists(_KNOWN_SSH_HOSTS_FILE):
+    if not os.path.exists(KNOWN_SSH_HOSTS_FILE):
         return {}
     
-    with open(_KNOWN_SSH_HOSTS_FILE, "r", encoding="utf-8") as f:
+    with open(KNOWN_SSH_HOSTS_FILE, "r", encoding="utf-8") as f:
         data = json.load(f)
     
-    _KNOWN_SSH_HOSTS.update({config["host"]: HostConfig(**config) for config in data})
+    KNOWN_SSH_HOSTS.update({config["host"]: HostConfig(**config) for config in data})
     
-    return _KNOWN_SSH_HOSTS
+    return KNOWN_SSH_HOSTS
 
 
 class SilentArgumentParser(argparse.ArgumentParser):

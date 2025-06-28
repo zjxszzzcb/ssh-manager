@@ -3,7 +3,7 @@ from textual import events
 from textual.app import App, ComposeResult
 from textual.binding import Binding
 from textual.widget import Widget
-from textual.widgets import DataTable, Input
+from textual.widgets import DataTable, Input, TextArea
 from textual.coordinate import Coordinate
 
 from typing import Optional, Sequence
@@ -40,8 +40,10 @@ class HostConfigEditor(TextEditor, inherit_bindings=False):
         Binding("ctrl+s", "save", "Save"),
     ]
 
-    def __init__(self, host_config: Optional[HostConfig] = None, **kwargs):
-        text = host_config.to_text(add_password=True)
+    def __init__(self, host_config: Optional[HostConfig] = None, text: str = "", **kwargs):
+
+        text = text or host_config.to_text()
+
         super().__init__(
             text=text,
             word_completer=ssh_config_completer,
@@ -54,6 +56,12 @@ class HostConfigEditor(TextEditor, inherit_bindings=False):
     def has_cursor(self) -> bool:
         return self.text_input.has_focus
 
+
+class TextEditor(TextArea):
+    BINDINGS = [
+        ("ctrl+a", "select_all", "Select All")
+
+    ]
 
 class EditableTableWidget(Widget):
 

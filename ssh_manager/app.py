@@ -7,6 +7,7 @@ from textual.binding import Binding
 from textual.logging import TextualHandler
 from typing import List
 
+from ssh_manager.screens.edit_ssh_config import EditSSHConfigScreen
 from ssh_manager.screens.main_screens import SSHManageMainScreen
 from ssh_manager.screens.ssh_conn_screens import SSHConnScreen
 from ssh_manager.utils.ssh_configs import (
@@ -48,9 +49,21 @@ class SSHManagerApp(App):
             self.main_screen.quit()
 
 
+class EditorSSHConfigApp(App):
+    """A simple Textual app to display the two-editor screen."""
+
+    BINDINGS = []
+
+    def on_mount(self) -> None:
+        """Called when the app is first mounted."""
+        # When the app starts, we immediately push the TwoEditorsScreen onto the display stack.
+        self.push_screen(EditSSHConfigScreen())
+
+
 def main():
     parser = argparse.ArgumentParser(description="SSH Manager")
     parser.add_argument("--init", action="store_true", help="Initialize SSH config file")
+    parser.add_argument("--update-config", action="store_true", help="Initialize SSH config file")
     parser.add_argument("--log-level", choices=['debug', 'info', 'warning', 'error'], default="warning")
     args, unkargs = parser.parse_known_args()
 
@@ -62,6 +75,11 @@ def main():
         for host, config in host_configs_map.items():
             update_ssh_config(config)
             print(f"Initialized SSH config for {host}")
+        return
+
+    elif args.update_config:
+        app = EditorSSHConfigApp()
+        app.run()
         return
     
     host_configs_map = load_known_ssh_hosts()

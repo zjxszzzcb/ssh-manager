@@ -8,7 +8,7 @@ version = "0.0.1"
 description = "manage ssh"
 
 dependencies = [
-    "textual==0.89.1",
+    "textual",
     "textual-dev",
     "asyncssh",
     "paramiko",
