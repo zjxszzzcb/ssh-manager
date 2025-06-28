@@ -187,6 +187,9 @@ class SilentArgumentParser(argparse.ArgumentParser):
 
 
 def parse_ssh_command(args: Sequence[str]) -> Optional[HostConfig]:
+    if not args:
+        return None
+
     parser = SilentArgumentParser(
         description="SSH Command Parser",
         exit_on_error=False
