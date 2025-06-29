@@ -20,7 +20,7 @@ def ssh_config_completer(word: str) -> Sequence[tuple[RenderableType, str]]:
 
         'Pa': ('Password',),
         'Po': ('Port',),
-        'Pr': ('ProxyCommand ssh -W %h:%p',),
+        'Pr': ('ProxyJump', 'ProxyCommand ssh -W %h:%p',),
         'P': ('Port', 'Password'),
 
         'U': ('User',),

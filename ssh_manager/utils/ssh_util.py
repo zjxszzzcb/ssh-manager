@@ -218,13 +218,19 @@ def get_ssh_connection(host: str) -> Optional[SSHConnection]:
 
 
 if __name__ == "__main__":
-    ssh_process = SSHConnection(HostConfig(host='ucloud', hostname='118.194.255.34', user='ubuntu', password='731008'))
+    from ssh_manager.utils.ssh_configs import load_known_ssh_hosts
 
-    time.sleep(10)
+    known_configs = load_known_ssh_hosts()
 
-    while ssh_process.is_alive():
-        print("Alive")
-        time.sleep(1)
+    connection = create_persistent_ssh_connection(known_configs['office'])
+
+    # ssh_process = SSHConnection(HostConfig(host='ucloud', hostname='118.194.255.34', user='ubuntu', password='731008'))
+    #
+    # time.sleep(10)
+    #
+    # while ssh_process.is_alive():
+    #     print("Alive")
+    #     time.sleep(1)
 
     # client = SSHClient()
     # client.load_system_host_keys()
@@ -232,4 +238,3 @@ if __name__ == "__main__":
     # client.connect(hostname='192.168.31.100', username='zzzcb')
     # stdin, stdout, stderr = client.exec_command('ls -l')
     # print(stdout.read().decode())
-    

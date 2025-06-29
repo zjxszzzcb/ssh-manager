@@ -1,6 +1,6 @@
 import argparse
-import os
 import json
+import os
 import uuid
 
 from pydantic import BaseModel
@@ -16,6 +16,7 @@ class HostConfig(BaseModel):
     local_forwards: Dict[str, str] = {}
     remote_forwards: Dict[str, str] = {}
     proxy_command: Optional[str] = None
+    proxy_jump: Optional[str] = None
     
     def get_ssh_command(self) -> List[str]:
         connect_commands = ['ssh', '-p', str(self.port), f'{self.user}@{self.hostname}']
@@ -24,6 +25,12 @@ class HostConfig(BaseModel):
             local_forwards_commands.extend(["-L", f"{local_port}:{remote_host_port}"])
         if self.proxy_command:
             connect_commands.extend(["-o", f"ProxyCommand={self.proxy_command}"])
+        if self.proxy_jump:
+            proxy_jump = self.proxy_jump
+            known_host_config = get_ssh_config(proxy_jump, None)
+            if known_host_config:
+                proxy_jump = f"{known_host_config.user}@{known_host_config.hostname}:{known_host_config.port}"
+            connect_commands.extend(["-J", proxy_jump])
         return connect_commands + local_forwards_commands
 
     def update_config(self, config: "HostConfig"):
@@ -72,8 +79,8 @@ def get_ssh_config_example() -> HostConfig:
     )
 
 
-def get_ssh_config(host: str) -> Optional[HostConfig]:
-    return KNOWN_SSH_HOSTS.get(host)
+def get_ssh_config(host: str, default: Any = None) -> Optional[HostConfig]:
+    return KNOWN_SSH_HOSTS.get(host, default)
 
 
 def update_ssh_config(config: HostConfig):
@@ -150,6 +157,9 @@ def parse_text_to_configs(text: str) -> Dict[str, HostConfig]:
 
         elif current_host and key == 'proxycommand':
             current_config['proxy_command'] = " ".join(values)
+
+        elif current_host and key == 'proxyjump':
+            current_config['proxy_jump'] = values[0]
 
         elif current_host:
             # 添加配置项
