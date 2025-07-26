@@ -11,7 +11,7 @@ from typing import Dict, List, Optional
 from ssh_manager.widgets.editor import HostConfigEditor
 from ssh_manager.widgets.host_list import HostListItem
 from ssh_manager.utils.ssh_configs import (
-    HostConfig, update_ssh_config, parse_text_to_configs, 
+    HostConfig, update_host_config, parse_text_to_configs,
     delete_ssh_config, get_ssh_config_example
 )
 from ssh_manager.utils.ssh_util import SSHConnection, create_persistent_ssh_connection, get_ssh_connection
@@ -228,7 +228,7 @@ class SSHManageMainScreen(Screen):
         """新建一个配置"""
         example_config = get_ssh_config_example()
         self.host_configs.append(example_config)
-        update_ssh_config(example_config)
+        update_host_config(example_config)
 
         new_item = HostListItem(example_config)
         list_view = self.query_one(ListView)
@@ -253,7 +253,7 @@ class SSHManageMainScreen(Screen):
                     return
             self.update_selected_item(new_config)
             # 更新配置
-            update_ssh_config(new_config)
+            update_host_config(new_config)
             # 将焦点移回列表
             self.action_focus_list()
 

@@ -11,7 +11,7 @@ from ssh_manager.screens.edit_ssh_config import EditSSHConfigScreen
 from ssh_manager.screens.main_screens import SSHManageMainScreen
 from ssh_manager.screens.ssh_conn_screens import SSHConnScreen
 from ssh_manager.utils.ssh_configs import (
-    HostConfig, load_ssh_config_file, update_ssh_config,
+    HostConfig, load_ssh_config_file, update_host_config,
     load_known_ssh_hosts, parse_ssh_command
 )
 
@@ -73,7 +73,7 @@ def main():
     if args.init:
         host_configs_map = load_ssh_config_file()
         for host, config in host_configs_map.items():
-            update_ssh_config(config)
+            update_host_config(config)
             print(f"Initialized SSH config for {host}")
         return
 
@@ -85,7 +85,7 @@ def main():
     host_configs_map = load_known_ssh_hosts()
     cmd_host_config = parse_ssh_command(unkargs)
     if cmd_host_config:
-        update_ssh_config(cmd_host_config)
+        update_host_config(cmd_host_config)
         host_configs_map[cmd_host_config.host] = cmd_host_config
 
     host_configs = list(host_configs_map.values())
