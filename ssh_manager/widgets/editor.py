@@ -42,7 +42,8 @@ class HostConfigEditor(TextEditor, inherit_bindings=False):
 
     def __init__(self, host_config: Optional[HostConfig] = None, text: str = "", **kwargs):
 
-        text = text or host_config.to_text()
+        if not text and isinstance(host_config, HostConfig):
+            text = host_config.to_text()
 
         super().__init__(
             text=text,

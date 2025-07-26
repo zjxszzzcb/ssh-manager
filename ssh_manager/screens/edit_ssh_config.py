@@ -4,7 +4,7 @@ from textual.screen import Screen
 from textual.widgets import Header, Footer, Static
 
 from ssh_manager.widgets.editor import TextEditor
-from ssh_manager.utils.ssh_configs import DEFAULT_SSH_CONFIG_FILE, load_known_ssh_hosts
+from ssh_manager.utils.ssh_configs import SSH_CONFIG_FILE_PATH, load_known_ssh_hosts
 
 
 # Define the custom screen with two editors
@@ -20,7 +20,7 @@ class EditSSHConfigScreen(Screen):
         # The Header widget displays the app title.
         yield Header()
 
-        with open(DEFAULT_SSH_CONFIG_FILE, "r", encoding="utf-8") as f:
+        with open(SSH_CONFIG_FILE_PATH, "r", encoding="utf-8") as f:
             user_ssh_config_text = f.read()
 
         known_ssh_configs = load_known_ssh_hosts()
@@ -44,5 +44,5 @@ class EditSSHConfigScreen(Screen):
     def action_save(self) -> None:
         """An action to trigger a save request."""
         left_editor = self.query_one("#left_editor")
-        with open(DEFAULT_SSH_CONFIG_FILE, "w", encoding="utf-8") as f:
+        with open(SSH_CONFIG_FILE_PATH, "w", encoding="utf-8") as f:
             f.write(left_editor.text)

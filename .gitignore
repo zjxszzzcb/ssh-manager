@@ -4,4 +4,4 @@ __pycache__/
 
 test.py
 
-known_ssh_hosts.json
+mssh_config.json

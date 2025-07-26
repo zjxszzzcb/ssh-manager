@@ -9,7 +9,7 @@ from typing import Any, Dict, List, Optional, Sequence, Union
 # Environment variable for SSH config file path, defaults to ~/.ssh/config
 SSH_CONFIG_FILE_PATH = os.getenv("SSH_HOME", os.path.expanduser("~/.ssh/config"))
 # Path to the JSON file that caches known SSH host configurations
-HOST_CACHE_FILE_PATH = os.path.join(os.path.dirname(__file__), "known_ssh_hosts.json")
+HOST_CACHE_FILE_PATH = os.path.join(os.path.dirname(__file__), "mssh_config.json")
 # In-memory cache for storing host configurations to avoid repeated file I/O
 HOST_CONFIG_CACHE: Dict[str, "HostConfig"] = {}
 
@@ -91,15 +91,23 @@ class HostConfig(BaseModel):
 
         # Add password line if requested (not standard SSH config)
         if add_password:
+            texts.append(f"{indent}# This is not a standard SSH config\n")
             texts.append(f"{indent}Password {self.password}\n")
 
         # Add local port forwarding rules
         for local_port, remote_host_port in self.local_forwards.items():
-            texts.append(f"{indent}LocalForward {local_port}:{remote_host_port}\n")
+            texts.append(f"{indent}# localhost:{local_port} -> remote's {remote_host_port}\n")
+            texts.append(f"{indent}LocalForward {local_port} {remote_host_port}\n")
 
         # Add proxy command if present
         if self.proxy_command:
-            texts.append(f"{indent}ProxyCommand {self.proxy_command}")
+            texts.append(f"{indent}# Command to connect through a proxy server\n")
+            texts.append(f"{indent}ProxyCommand {self.proxy_command}\n")
+
+        # Add proxy jump if present
+        if self.proxy_jump:
+            texts.append(f"{indent}# Through host to reach target\n")
+            texts.append(f"{indent}ProxyJump {self.proxy_jump}\n")
 
         return "".join(texts)
     
@@ -116,14 +124,6 @@ class HostConfig(BaseModel):
         return next(iter(parse_text_to_configs(text).values()), None)
 
 
-# Default SSH configuration file path
-DEFAULT_SSH_CONFIG_FILE = os.path.expanduser("~/.ssh/config")
-# File path for storing known SSH hosts in JSON format
-KNOWN_SSH_HOSTS_FILE = os.path.join(os.path.dirname(__file__), "known_ssh_hosts.json")
-# In-memory cache of known SSH host configurations
-KNOWN_SSH_HOSTS: Dict[str, HostConfig] = {}
-
-
 def get_ssh_config_example() -> HostConfig:
     """Generate an example SSH host configuration for demonstration purposes.
     
@@ -131,11 +131,12 @@ def get_ssh_config_example() -> HostConfig:
         HostConfig: Example configuration with random host name and sample settings
     """
     return HostConfig(
-        host=f"ubuntu-{str(uuid.uuid4())[:8]}",
+        host=f"machine-{str(uuid.uuid4())[:8]}",
         hostname="127.0.0.1",
         user="root",
         port=22,
-        local_forwards={"8888": "localhost:80"},
+        local_forwards={"8000": "localhost:80"},
+        proxy_jump='jump-machine-host'
     )
 
 

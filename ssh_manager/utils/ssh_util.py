@@ -7,7 +7,6 @@ import time
 import traceback
 import uuid
 
-import paramiko
 from paramiko.client import SSHClient
 from paramiko.ssh_exception import AuthenticationException
 from typing import Dict, Optional
@@ -66,8 +65,12 @@ class SSHConnection(subprocess.Popen):
         self._initialize_client()
 
         print(f"[INFO] Establishing an SSH connection, this requires key-based authentication.")
-        
+
+        # Connection state management
+        self._available = False
+        self._running = True
         # Initialize subprocess with SSH command
+        print(f"Executing command >> `{' '.join(self.host_config.get_ssh_command())}`")
         super().__init__(
             args=host_config.get_ssh_command(),
             stdin=subprocess.PIPE,
@@ -76,11 +79,6 @@ class SSHConnection(subprocess.Popen):
             text=True,
             **kwargs
         )
-        
-        # Connection state management
-        self._available = False
-        self._running = True
-        
         # Start daemon thread to monitor connection
         self.daemon_thread = threading.Thread(target=self._connection_daemon, daemon=True)
         self.daemon_thread.start()
@@ -100,21 +98,17 @@ class SSHConnection(subprocess.Popen):
         password authentication if needed. It also handles SSH public key upload
         for future key-based authentication.
         """
-        print(f"Executing command >> `{' '.join(self.host_config.get_ssh_command())}`")
+        if self.host_config.proxy_command or self.host_config.proxy_jump:
+            print(f"[WARNING] paramiko SSHClient is disabled in proxy mode")
+            # TODO: Implement paramiko SSHClient support for proxy connections
+            return None
         try:
-            # Set up proxy command if specified
-            if self.host_config.proxy_command:
-                proxy_command = paramiko.ProxyCommand(self.host_config.proxy_command)
-            else:
-                proxy_command = None
-                
             # Load system host keys and attempt connection
             self.client.load_system_host_keys()
             self.client.connect(
                 hostname=self.host_config.hostname,
                 username=self.host_config.user,
                 port=self.host_config.port,
-                sock=proxy_command,
                 auth_timeout=3,
             )
         except AuthenticationException:
@@ -169,8 +163,12 @@ class SSHConnection(subprocess.Popen):
         Returns:
             str: Combined stdout and stderr output from the command
         """
-        stdin, stdout, stderr = self.client.exec_command(command)
-        return stdout.read().decode(encoding="utf-8") + stderr.read().decode(encoding="utf-8")
+        if isinstance(self.client, SSHClient):
+            stdin, stdout, stderr = self.client.exec_command(command)
+            return stdout.read().decode(encoding="utf-8") + stderr.read().decode(encoding="utf-8")
+        else:
+            print("[WARNING] No paramiko SSHClient available")
+            return ""
 
     def _connection_daemon(self):
         """Daemon thread that monitors the SSH connection health.
