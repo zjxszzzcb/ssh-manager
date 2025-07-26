@@ -18,18 +18,23 @@ class SSHConnScreen(Screen):
 
     CSS = """
     Screen {
-        background: $surface;
+        background: #161b22;
+        color: #e6edf3;
+    }
+
+    Vertical {
+        background: #161b22;
     }
 
     #host_label {
         width: 100%;
         height: auto;
         text-align: center;
-        background: $surface-lighten-1;
-        color: $accent;
-        margin: 1;
+        background: #161b22;
+        color: #e6edf3;
+        margin: 1 1 0 1;
         padding: 1;
-        border: solid $accent;
+        border: solid #21262d;
         content-align: center middle;
         text-style: bold;
     }
@@ -37,31 +42,43 @@ class SSHConnScreen(Screen):
     Button {
         width: 100%;
         margin: 1;
-        background: $accent;
-        color: $text;
+        background: #238636;
+        color: #ffffff;
         border: tall transparent;
     }
 
     Button:hover {
-        background: $accent-darken-2;
+        background: #2ea043;
     }
 
     Button:focus {
-        border: tall $accent-lighten-2;
-        background: $accent-darken-1;
+        border: tall #2ea043;
+        background: #1f6feb;
     }
 
     ProxyManageTable {
         height: 1fr;
         margin: 1;
+        background: #161b22;
     }
 
     DataTable {
-        border: tall transparent;
+        border: tall #21262d;
+        background: #161b22;
     }
 
     DataTable:focus {
-        border: tall $accent-lighten-2;
+        border: tall #1f6feb;
+    }
+
+    Input {
+        background: #161b22;
+        color: #e6edf3;
+        border: round #21262d;
+    }
+
+    Input:focus {
+        border: round #1f6feb;
     }
     """
 

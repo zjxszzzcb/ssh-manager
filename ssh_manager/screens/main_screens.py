@@ -44,41 +44,41 @@ class SSHManageMainScreen(Screen):
 
     CSS = """
     Screen {
-        background: $surface;
+        background: #161b22;
+        color: #e6edf3;
     }
 
     Horizontal {
-        height: 90%;
-        background: $surface;
-        margin: 0 0 1 0;
+        height: 1fr;
+        background: #161b22;
     }
 
     ListView {
         width: 50%;
-        border: solid green;
+        border: solid #21262d;
         scrollbar-gutter: stable;
         padding: 0 1;
-        background: $surface;
+        background: #161b22;
     }
 
     HostConfigEditor {
         width: 50%;
-        border: solid blue;
-        background: $surface;
+        border: solid #238636;
+        background: #161b22;
         margin: 0 1;
     }
 
     ListView:focus {
-        border: solid yellow;
+        border: solid #1f6feb;
     }
 
     HostConfigEditor:focus {
-        border: solid yellow !important;
+        border: solid #1f6feb !important;
     }
 
     Footer {
-        background: $surface;
-        color: $text;
+        background: #161b22;
+        color: #e6edf3;
         height: 1;
     }
     """
