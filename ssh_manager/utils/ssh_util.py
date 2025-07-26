@@ -16,6 +16,11 @@ from ssh_manager.utils.ssh_configs import HostConfig
 
 
 def load_public_key():
+    """Load SSH public key from the default location (~/.ssh/id_rsa.pub).
+    
+    Returns:
+        str: Content of the public key file
+    """
     public_key_file = os.path.expanduser("~/.ssh/id_rsa.pub")
     if not os.path.exists(public_key_file):
         pass
@@ -24,6 +29,11 @@ def load_public_key():
 
 
 def load_private_key():
+    """Load SSH private key from the default location (~/.ssh/id_rsa).
+    
+    Returns:
+        str: Content of the private key file
+    """
     private_key_file = os.path.expanduser("~/.ssh/id_rsa")
     if not os.path.exists(private_key_file):
         pass
@@ -32,14 +42,32 @@ def load_private_key():
 
 
 class SSHConnection(subprocess.Popen):
+    """SSH connection class that extends subprocess.Popen to manage SSH connections.
+    
+    This class provides a wrapper around SSH connections with automatic key-based
+    authentication, password fallback, and connection monitoring through a daemon thread.
+    """
+    
     def __init__(self, host_config: HostConfig, **kwargs):
+        """Initialize SSH connection with the given host configuration.
+        
+        Args:
+            host_config (HostConfig): Configuration object containing SSH connection details
+            **kwargs: Additional arguments passed to subprocess.Popen
+            
+        Raises:
+            TimeoutError: If connection cannot be established within 10 seconds
+        """
         self.client = SSHClient()
         self.host_config = host_config
         self.logger = logging.getLogger(self.host)
 
+        # Initialize the SSH client connection
         self._initialize_client()
 
         print(f"[INFO] Establishing an SSH connection, this requires key-based authentication.")
+        
+        # Initialize subprocess with SSH command
         super().__init__(
             args=host_config.get_ssh_command(),
             stdin=subprocess.PIPE,
@@ -48,12 +76,16 @@ class SSHConnection(subprocess.Popen):
             text=True,
             **kwargs
         )
+        
+        # Connection state management
         self._available = False
         self._running = True
-        self.daemon_thread = threading.Thread(target=self.keep_alive, daemon=True)
+        
+        # Start daemon thread to monitor connection
+        self.daemon_thread = threading.Thread(target=self._connection_daemon, daemon=True)
         self.daemon_thread.start()
 
-        # 等待加载完成，最大10秒
+        # Wait for connection to be ready (maximum 10 seconds)
         for _ in range(100):
             if self._available:
                 break
@@ -62,13 +94,21 @@ class SSHConnection(subprocess.Popen):
             raise TimeoutError("Failed to create ssh connection")
 
     def _initialize_client(self):
-
+        """Initialize the SSH client with authentication and proxy settings.
+        
+        This method attempts key-based authentication first, then falls back to
+        password authentication if needed. It also handles SSH public key upload
+        for future key-based authentication.
+        """
         print(f"Executing command >> `{' '.join(self.host_config.get_ssh_command())}`")
         try:
+            # Set up proxy command if specified
             if self.host_config.proxy_command:
                 proxy_command = paramiko.ProxyCommand(self.host_config.proxy_command)
             else:
                 proxy_command = None
+                
+            # Load system host keys and attempt connection
             self.client.load_system_host_keys()
             self.client.connect(
                 hostname=self.host_config.hostname,
@@ -78,6 +118,7 @@ class SSHConnection(subprocess.Popen):
                 auth_timeout=3,
             )
         except AuthenticationException:
+            # Fallback to password authentication if key-based auth fails
             for _ in range(3):
                 success, password = self.connect_by_password(self.host_config)
                 if success:
@@ -88,6 +129,7 @@ class SSHConnection(subprocess.Popen):
                       f"on port `{self.host_config.port}`")
                 return
 
+            # Upload SSH public key for future key-based authentication
             print("[INFO] Uploading SSH public key (~/.ssh/id_rsa.pub)")
             stdin, stdout, stderr = self.client.exec_command(
                 f"echo \"\n{load_public_key()}\" >> ~/.ssh/authorized_keys"
@@ -100,21 +142,52 @@ class SSHConnection(subprocess.Popen):
 
     @property
     def host(self):
+        """Get the host identifier from the configuration.
+        
+        Returns:
+            str: The host identifier
+        """
         return self.host_config.host
 
     def add_local_forward(self, local_port: str, forward_host: str, forward_port: int):
+        """Add a local port forwarding rule to the SSH connection.
+        
+        Args:
+            local_port (str): Local port to forward from
+            forward_host (str): Target host to forward to
+            forward_port (int): Target port to forward to
+        """
         self.host_config.local_forwards[local_port] = f"{forward_host}:{forward_port}"
         create_persistent_ssh_connection(self.host_config)
 
     def exec_command(self, command: str) -> str:
+        """Execute a command on the remote SSH server.
+        
+        Args:
+            command (str): Command to execute on the remote server
+            
+        Returns:
+            str: Combined stdout and stderr output from the command
+        """
         stdin, stdout, stderr = self.client.exec_command(command)
         return stdout.read().decode(encoding="utf-8") + stderr.read().decode(encoding="utf-8")
 
-    def keep_alive(self):
+    def _connection_daemon(self):
+        """Daemon thread that monitors the SSH connection health.
+        
+        This method runs in a separate thread to continuously monitor the SSH
+        connection by sending periodic echo commands and checking responses.
+        It marks the connection as available once initial setup is complete.
+        """
+        # Generate unique flag for connection testing
         flag = str(uuid.uuid4())
         command = f'echo "{flag}"\n'
+        
+        # Send initial test command
         self.stdin.write(command)
         self.stdin.flush()
+        
+        # Wait for initial response to confirm connection is ready
         while self._running:
             try:
                 content = self.stdout.readline()
@@ -123,10 +196,13 @@ class SSHConnection(subprocess.Popen):
                     break
                 if flag in content:
                     break
-            except (IOError, ValueError):  # 管道已关闭
+            except (IOError, ValueError):  # Pipe closed
                 break
         
+        # Mark connection as available
         self._available = True
+        
+        # Continue monitoring connection with periodic heartbeat
         while self._running:
             try:
                 self.stdin.write(command)
@@ -135,29 +211,50 @@ class SSHConnection(subprocess.Popen):
                 if not output:  # EOF reached
                     break
                 self.logger.debug(f"pause.")
-                time.sleep(3)
-            except (IOError, ValueError):  # 管道已关闭
+                time.sleep(3)  # Wait 3 seconds between heartbeats
+            except (IOError, ValueError):  # Pipe closed
                 break
 
+        # Connection lost or terminated
         self.logger.info(f"stop")
         self._available = False
         close_persistent_ssh_connection(self.host_config)
 
     def terminate(self) -> None:
-        """重写terminate方法以确保守护线程正确退出"""
+        """Override terminate method to ensure daemon thread exits properly.
+        
+        This method stops the daemon thread and closes the persistent SSH connection
+        before calling the parent terminate method.
+        """
         self._running = False
         super().terminate()
         close_persistent_ssh_connection(self.host_config)
 
     def is_alive(self):
+        """Check if the SSH connection is alive and available.
+        
+        Returns:
+            bool: True if connection is alive and available, False otherwise
+        """
         return self.poll() is None and self._available
 
     def connect_by_password(self, host_config: HostConfig):
+        """Attempt to connect using password authentication.
+        
+        Args:
+            host_config (HostConfig): Host configuration containing connection details
+            
+        Returns:
+            tuple: (success: bool, password: str) - Success status and password used
+        """
         password = host_config.password
         success = False
         try:
+            # Prompt for password if not provided
             if not password:
                 password = input("Password:")
+                
+            # Attempt password-based connection
             self.client.connect(
                 hostname=host_config.hostname,
                 username=host_config.user,
@@ -175,25 +272,38 @@ class SSHConnection(subprocess.Popen):
         return success, password
 
 
+# Global dictionary to store persistent SSH connections
 _PERSISTENT_SSH_CONNECTIONS: Dict[str, SSHConnection] = {}
 
 
 def create_persistent_ssh_connection(host_config: HostConfig) -> Optional[SSHConnection]:
-    """创建持久化SSH连接
+    """Create a persistent SSH connection that can be reused.
+    
+    This function creates a new SSH connection and stores it in the global
+    connections dictionary. If a connection already exists for the host,
+    it terminates the old one before creating a new one.
     
     Args:
-        host_config: 主机配置
+        host_config (HostConfig): Configuration object containing SSH connection details
+        
+    Returns:
+        Optional[SSHConnection]: The created SSH connection, or None if creation failed
     """
     try:
+        # Clear terminal screen based on operating system
         if platform.system() == "Windows":
             os.system('cls')
         else:
             os.system('clear')
+            
+        # Create new SSH connection
         ssh_connection = SSHConnection(host_config)
 
+        # Terminate existing connection if present
         if _PERSISTENT_SSH_CONNECTIONS.get(host_config.host):
             _PERSISTENT_SSH_CONNECTIONS[host_config.host].terminate()
     
+        # Store the new connection
         _PERSISTENT_SSH_CONNECTIONS[host_config.host] = ssh_connection
 
         return ssh_connection
@@ -204,37 +314,22 @@ def create_persistent_ssh_connection(host_config: HostConfig) -> Optional[SSHCon
 
 
 def close_persistent_ssh_connection(host_config: HostConfig):
-    """关闭持久化SSH连接
+    """Close and remove a persistent SSH connection.
     
     Args:
-        host_config: 主机配置
+        host_config (HostConfig): Configuration object containing the host to disconnect
     """
     if _PERSISTENT_SSH_CONNECTIONS.get(host_config.host):
         _PERSISTENT_SSH_CONNECTIONS.pop(host_config.host).terminate()
 
 
 def get_ssh_connection(host: str) -> Optional[SSHConnection]:
+    """Retrieve an existing persistent SSH connection by host identifier.
+    
+    Args:
+        host (str): Host identifier to look up
+        
+    Returns:
+        Optional[SSHConnection]: The SSH connection if found, None otherwise
+    """
     return _PERSISTENT_SSH_CONNECTIONS.get(host)
-
-
-if __name__ == "__main__":
-    from ssh_manager.utils.ssh_configs import load_known_ssh_hosts
-
-    known_configs = load_known_ssh_hosts()
-
-    connection = create_persistent_ssh_connection(known_configs['office'])
-
-    # ssh_process = SSHConnection(HostConfig(host='ucloud', hostname='118.194.255.34', user='ubuntu', password='731008'))
-    #
-    # time.sleep(10)
-    #
-    # while ssh_process.is_alive():
-    #     print("Alive")
-    #     time.sleep(1)
-
-    # client = SSHClient()
-    # client.load_system_host_keys()
-    # print(client.get_host_keys()['192.168.31.100'])
-    # client.connect(hostname='192.168.31.100', username='zzzcb')
-    # stdin, stdout, stderr = client.exec_command('ls -l')
-    # print(stdout.read().decode())

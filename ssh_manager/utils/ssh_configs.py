@@ -391,27 +391,3 @@ def parse_ssh_command(cmd_args: Sequence[str]) -> Optional[HostConfig]:
         return HostConfig(**new_config)
     else:
         return host_config
-
-
-if __name__ == "__main__":
-    # Example usage: Parse SSH config text and generate SSH command
-    # print(parse_text_to_configs(
-    #     "Host jetson\n"
-    #     "HostName 192.168.31.100\n"
-    #     "User zzzcb\n"
-    #     "Port 22\n"
-    #     "Password None\n"
-    #     "ProxyCommand ssh -W %h:%p zzzcb-ubuntu\n"
-    # )['jetson'].get_ssh_command())
-
-    # Example usage: Create persistent SSH connection using parsed config
-    from ssh_manager.utils.ssh_util import create_persistent_ssh_connection
-
-    create_persistent_ssh_connection(parse_text_to_configs(
-        "Host jetson\n"
-        "HostName 192.168.31.42\n"
-        "User zzzcb\n"
-        "Port 22\n"
-        "Password None\n"
-        "ProxyCommand ssh -W 192.168.31.42:22 zzzcb-ubuntu\n"
-    )['jetson'])

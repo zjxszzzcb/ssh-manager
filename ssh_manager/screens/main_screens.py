@@ -12,7 +12,7 @@ from ssh_manager.widgets.editor import HostConfigEditor
 from ssh_manager.widgets.host_list import HostListItem
 from ssh_manager.utils.ssh_configs import (
     HostConfig, update_host_config, parse_text_to_configs,
-    delete_ssh_config, get_ssh_config_example
+    remove_host_config, get_ssh_config_example
 )
 from ssh_manager.utils.ssh_util import SSHConnection, create_persistent_ssh_connection, get_ssh_connection
 
@@ -261,7 +261,7 @@ class SSHManageMainScreen(Screen):
         """删除当前选中的配置"""
         list_view = self.query_one(ListView)
         if list_view.has_focus and list_view.children:
-            delete_ssh_config(self.host_configs[list_view.index].host)
+            remove_host_config(self.host_configs[list_view.index].host)
             self.host_configs.pop(list_view.index)
             selected_item = list_view.children[list_view.index]
             selected_item.remove()
