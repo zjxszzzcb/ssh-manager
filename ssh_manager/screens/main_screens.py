@@ -24,6 +24,7 @@ class SSHManageMainScreen(Screen):
     
     Args:
         host_configs: 主机配置列表
+        selected: 初始选中的主机配置，如果为None则默认选中第一项
     """
 
     BINDINGS = [
@@ -82,10 +83,11 @@ class SSHManageMainScreen(Screen):
     }
     """
 
-    def __init__(self, host_configs: Optional[List[HostConfig]] = None):
+    def __init__(self, host_configs: Optional[List[HostConfig]] = None, selected: Optional[HostConfig] = None):
         super().__init__()
 
         self.host_configs: List[HostConfig] = host_configs or []
+        self._initial_selected_config: Optional[HostConfig] = selected
         # host_alias -> SSHConnection
         self.connections: Dict[str, SSHConnection] = dict()
 
@@ -114,11 +116,23 @@ class SSHManageMainScreen(Screen):
             for config in self.host_configs:
                 list_view.append(HostListItem(config))
 
-            # 设置初始焦点到列表视图并选中第一项
+            # 设置初始焦点到列表视图
             list_view.focus()
-            list_view.index = 0
-
-            self.update_editor(self.host_configs[0].to_text(add_password=True))
+            
+            # 确定初始选中的索引位置
+            initial_index = 0
+            if self._initial_selected_config:
+                # 查找指定的配置在列表中的位置
+                for i, config in enumerate(self.host_configs):
+                    if config.host == self._initial_selected_config.host:
+                        initial_index = i
+                        break
+            
+            # 设置列表选中位置
+            list_view.index = initial_index
+            
+            # 更新编辑器显示对应配置
+            self.update_editor(self.host_configs[initial_index].to_text(add_password=True))
 
         # 设置定时器每秒更新一次连接状态
         self.set_interval(1.0, self.update_connection_status)

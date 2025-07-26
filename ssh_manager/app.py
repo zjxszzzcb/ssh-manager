@@ -22,11 +22,11 @@ class SSHManagerApp(App):
         Binding("c", "connect", "Connect", show=True),
     ]
 
-    def __init__(self, host_configs: List[HostConfig]):
+    def __init__(self, host_configs: List[HostConfig], selected_config: HostConfig = None):
 
         super().__init__()
 
-        self.main_screen = SSHManageMainScreen(host_configs)
+        self.main_screen = SSHManageMainScreen(host_configs, selected=selected_config)
 
     def on_mount(self):
         self.install_screen(self.main_screen, name="main_screen")
@@ -89,7 +89,7 @@ def main():
         host_configs_map[cmd_host_config.host] = cmd_host_config
 
     host_configs = list(host_configs_map.values())
-    app = SSHManagerApp(host_configs)
+    app = SSHManagerApp(host_configs, selected_config=cmd_host_config)
 
     app.run()
 
