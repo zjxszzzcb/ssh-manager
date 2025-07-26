@@ -4,7 +4,7 @@ from textual import on, events
 from textual.app import ComposeResult
 from textual.screen import Screen
 from textual.binding import Binding
-from textual.widgets import Button, DataTable, Footer
+from textual.widgets import Button, DataTable, Footer, Label
 from textual.containers import Vertical
 
 from ssh_manager.widgets.proxy_table import ProxyManageTable
@@ -12,12 +12,26 @@ from ssh_manager.utils.ssh_configs import HostConfig
 from ssh_manager.utils.ssh_util import create_persistent_ssh_connection
 from ssh_manager.utils.terminal_util import open_new_terminal
 
+
 class SSHConnScreen(Screen):
     """SSH 连接界面"""
 
     CSS = """
     Screen {
         background: $surface;
+    }
+
+    #host_label {
+        width: 100%;
+        height: auto;
+        text-align: center;
+        background: $surface-lighten-1;
+        color: $accent;
+        margin: 1;
+        padding: 1;
+        border: solid $accent;
+        content-align: center middle;
+        text-style: bold;
     }
 
     Button {
@@ -70,13 +84,19 @@ class SSHConnScreen(Screen):
         for local_port, forward_address in self.host_config.local_forwards.items():
             local_forwards.append((local_port, *forward_address.split(":")))
         print(f"[DEBUG] Local forwards: {local_forwards}")
+        
+        label_text = f"SSH Connection: {self.host_config.host}"
+        print(f"[DEBUG] Creating label with text: {label_text}")
+        
         with Vertical():
+            yield Label(label_text, id="host_label")
             yield Button("New Shell", id="new_shell")
             table = ProxyManageTable(local_forwards)
             table.can_focus = True
             yield table
 
         yield Footer()
+
     def on_mount(self) -> None:
         """初始化界面"""
         print("[DEBUG] SSHConnUI on_mount")
@@ -178,6 +198,7 @@ class SSHConnScreen(Screen):
         print(f"[DEBUG] Generated SSH command: {ssh_command}")
         open_new_terminal(ssh_command)
 
+
 # 这个独立运行的部分需要修改为使用App来包装Screen
 def view_ssh_conn_ui():
     from textual.app import App
@@ -201,6 +222,7 @@ def view_ssh_conn_ui():
 
     app = TestApp()
     app.run()
+
 
 if __name__ == "__main__":
     view_ssh_conn_ui()
