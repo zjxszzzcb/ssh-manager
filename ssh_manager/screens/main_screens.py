@@ -3,8 +3,8 @@ import logging
 from textual import on
 from textual.app import App, ComposeResult
 from textual.screen import Screen
-from textual.containers import Horizontal
-from textual.widgets import ListView, Footer
+from textual.containers import Horizontal, Vertical
+from textual.widgets import ListView, Footer, Label
 from textual.binding import Binding
 from typing import Dict, List, Optional
 
@@ -53,19 +53,44 @@ class SSHManageMainScreen(Screen):
         background: #161b22;
     }
 
-    ListView {
+    #host_list_area {
         width: 50%;
+        background: #161b22;
+    }
+
+    #editor_area {
+        width: 50%;
+        background: #161b22;
+    }
+
+    #host_list_label, #editor_label {
+        width: 100%;
+        height: 1;
+        text-align: center;
+        background: #161b22;
+        color: #ffb366;
+        margin: 0 1 0 1;
+        padding: 0;
+        border: none;
+        content-align: center middle;
+        text-style: bold;
+    }
+
+    ListView {
+        width: 100%;
         border: solid #21262d;
         scrollbar-gutter: stable;
         padding: 0 1;
         background: #161b22;
+        margin: 0 1;
     }
 
     HostConfigEditor {
-        width: 50%;
+        width: 100%;
+        height: 1fr;
         border: solid #238636;
         background: #161b22;
-        margin: 0 1;
+        margin: 0 1 0 0;
     }
 
     ListView:focus {
@@ -73,7 +98,7 @@ class SSHManageMainScreen(Screen):
     }
 
     HostConfigEditor:focus {
-        border: solid #1f6feb !important;
+        border: solid #1f6feb;
     }
 
     Footer {
@@ -94,15 +119,19 @@ class SSHManageMainScreen(Screen):
     def compose(self) -> ComposeResult:
         # 创建水平布局
         with Horizontal():
-            # 左侧主机列表
-            list_view = ListView()
-            list_view.can_focus = True
-            yield list_view
+            # 左侧主机列表区域
+            with Vertical(id="host_list_area"):
+                yield Label("🚀  SSH Hosts", id="host_list_label")
+                list_view = ListView()
+                list_view.can_focus = True
+                yield list_view
             
-            # 右侧配置编辑器（默认显示第一个主机的配置）
-            editor = HostConfigEditor(self.host_configs[0] if self.host_configs else None)
-            editor.can_focus = True  # 允许编辑器获得焦点
-            yield editor
+            # 右侧配置编辑器区域
+            with Vertical(id="editor_area"):
+                yield Label("🔧  Configuration Editor", id="editor_label")
+                editor = HostConfigEditor(self.host_configs[0] if self.host_configs else None)
+                editor.can_focus = True  # 允许编辑器获得焦点
+                yield editor
         
         # 添加底部快捷键提示
         yield Footer()

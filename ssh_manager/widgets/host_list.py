@@ -21,13 +21,13 @@ class HostListItem(ListItem):
 
     def compose(self) -> ComposeResult:
         """Compose the list item."""
-        status_dot = "[green]●[/]" if self.host_info.is_alive else "[red]●[/]"
+        status_dot = "[#238636]●[/]" if self.host_info.is_alive else "[#f85149]●[/]"
         status_text = "active" if self.host_info.is_alive else "offline"
         yield Label(f"{status_dot} {self.host_info.host} ({status_text})")
     
     def update_status(self) -> None:
         """Update the status display."""
-        status_dot = "[green]●[/]" if self.host_info.is_alive else "[red]●[/]"
+        status_dot = "[#238636]●[/]" if self.host_info.is_alive else "[#f85149]●[/]"
         status_text = "active" if self.host_info.is_alive else "offline"
         
         # Get the first Label widget and update its content
