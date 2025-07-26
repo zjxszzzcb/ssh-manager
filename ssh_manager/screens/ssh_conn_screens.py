@@ -5,7 +5,7 @@ from textual.app import ComposeResult
 from textual.screen import Screen
 from textual.binding import Binding
 from textual.widgets import Button, DataTable, Footer, Label
-from textual.containers import Vertical
+from textual.containers import Vertical, Horizontal, Center, Middle
 
 from ssh_manager.widgets.proxy_table import ProxyManageTable
 from ssh_manager.utils.ssh_configs import HostConfig
@@ -22,8 +22,19 @@ class SSHConnScreen(Screen):
         color: #e6edf3;
     }
 
-    Vertical {
+    Center {
         background: #161b22;
+    }
+
+    Middle {
+        background: #161b22;
+    }
+
+    #content_container {
+        background: #161b22;
+        width: 80;
+        height: auto;
+        margin: 2;
     }
 
     #host_label {
@@ -31,8 +42,8 @@ class SSHConnScreen(Screen):
         height: auto;
         text-align: center;
         background: #161b22;
-        color: #e6edf3;
-        margin: 1 1 0 1;
+        color: #7fb069;
+        margin: 1 0;
         padding: 1;
         border: solid #21262d;
         content-align: center middle;
@@ -41,30 +52,29 @@ class SSHConnScreen(Screen):
 
     Button {
         width: 100%;
-        margin: 1;
-        background: #238636;
+        margin: 1 0;
+        background: #1f6feb;
         color: #ffffff;
         border: tall transparent;
     }
 
-    Button:hover {
-        background: #2ea043;
-    }
-
     Button:focus {
-        border: tall #2ea043;
-        background: #1f6feb;
+        background: #238636;
     }
 
     ProxyManageTable {
         height: 1fr;
-        margin: 1;
+        margin: 0;
         background: #161b22;
+        overflow-x: hidden;
+        scrollbar-size-horizontal: 0;
     }
 
     DataTable {
         border: tall #21262d;
         background: #161b22;
+        overflow-x: hidden;
+        scrollbar-size-horizontal: 0;
     }
 
     DataTable:focus {
@@ -79,6 +89,19 @@ class SSHConnScreen(Screen):
 
     Input:focus {
         border: round #1f6feb;
+    }
+
+    #table_label {
+        width: 100%;
+        height: 1;
+        text-align: center;
+        background: #161b22;
+        color: #7fb069;
+        margin: 1 0 0 0;
+        padding: 0;
+        border: none;
+        content-align: center middle;
+        text-style: bold;
     }
     """
 
@@ -102,15 +125,28 @@ class SSHConnScreen(Screen):
             local_forwards.append((local_port, *forward_address.split(":")))
         print(f"[DEBUG] Local forwards: {local_forwards}")
         
-        label_text = f"SSH Connection: {self.host_config.host}"
+        # 创建多行标签文本
+        label_lines = [
+            f"⚡ SSH Connection: {self.host_config.host}",
+            f"🌐 Hostname: {self.host_config.hostname} | Port: {self.host_config.port}",
+        ]
+        if self.host_config.user:
+            label_lines.append(f"🙋‍♂️ User: {self.host_config.user}")
+        if self.host_config.password:
+            label_lines.append(f"🔑 Password: {self.host_config.password}")
+        
+        label_text = "\n".join(label_lines)
         print(f"[DEBUG] Creating label with text: {label_text}")
         
-        with Vertical():
-            yield Label(label_text, id="host_label")
-            yield Button("New Shell", id="new_shell")
-            table = ProxyManageTable(local_forwards)
-            table.can_focus = True
-            yield table
+        with Center():
+            with Middle():
+                with Vertical(id="content_container"):
+                    yield Label(label_text, id="host_label")
+                    yield Button("🚀 New Shell", id="new_shell")
+                    yield Label("🔗 Port Forwarding", id="table_label")
+                    table = ProxyManageTable(local_forwards)
+                    table.can_focus = True
+                    yield table
 
         yield Footer()
 
