@@ -4,14 +4,15 @@ from textual.screen import Screen
 from textual.widgets import Header, Footer, Static
 
 from ssh_manager.widgets.editor import TextEditor
-from ssh_manager.utils.ssh_configs import SSH_CONFIG_FILE_PATH, load_known_ssh_hosts
+from ssh_manager.utils.ssh_configs import (
+    SSH_CONFIG_FILE_PATH, load_known_ssh_hosts, parse_text_to_configs, update_host_config
+)
 
 
 # Define the custom screen with two editors
 class EditSSHConfigScreen(Screen):
 
     BINDINGS = [
-        ("esc", "quit", "Quit"),
         ("ctrl+s", "save", "Save"),
     ]
 

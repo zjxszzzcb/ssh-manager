@@ -52,7 +52,7 @@ class SSHManagerApp(App):
 class EditorSSHConfigApp(App):
     """A simple Textual app to display the two-editor screen."""
 
-    BINDINGS = []
+    BINDINGS = [Binding("escape", "quit", "Quit", show=True)]
 
     def on_mount(self) -> None:
         """Called when the app is first mounted."""
@@ -63,7 +63,7 @@ class EditorSSHConfigApp(App):
 def main():
     parser = argparse.ArgumentParser(description="SSH Manager")
     parser.add_argument("--init", action="store_true", help="Initialize SSH config file")
-    parser.add_argument("--update-config", action="store_true", help="Initialize SSH config file")
+    parser.add_argument("--configure", action="store_true", help="Configure SSH config file")
     parser.add_argument("--log-level", choices=['debug', 'info', 'warning', 'error'], default="warning")
     args, unkargs = parser.parse_known_args()
 
@@ -77,7 +77,7 @@ def main():
             print(f"Initialized SSH config for {host}")
         return
 
-    elif args.update_config:
+    elif args.configure:
         app = EditorSSHConfigApp()
         app.run()
         return
