@@ -5,7 +5,7 @@ from textual.app import ComposeResult
 from textual.screen import Screen
 from textual.binding import Binding
 from textual.widgets import Button, DataTable, Footer, Label
-from textual.containers import Vertical, Horizontal, Center, Middle
+from textual.containers import Vertical, Center, Middle
 
 from ssh_manager.widgets.proxy_table import ProxyManageTable
 from ssh_manager.utils.ssh_configs import HostConfig
@@ -122,7 +122,8 @@ class SSHConnScreen(Screen):
         print("[DEBUG] SSHConnUI compose called")
         local_forwards = []
         for local_port, forward_address in self.host_config.local_forwards.items():
-            local_forwards.append((local_port, *forward_address.split(":")))
+            # 为ProxyManageTable添加空的行号列（第一列将被自动填充）
+            local_forwards.append(("", local_port, *forward_address.split(":")))
         print(f"[DEBUG] Local forwards: {local_forwards}")
         
         # 创建多行标签文本
@@ -157,7 +158,7 @@ class SSHConnScreen(Screen):
         # 确保表格可以获得焦点
         table = self.query_one(ProxyManageTable)
         table.can_focus = True
-        table._data_table.can_focus = True
+        table.data_table.can_focus = True
     
     def on_key(self, event: events.Key) -> None:
         if event.key == "up":
@@ -197,9 +198,9 @@ class SSHConnScreen(Screen):
             # 先聚焦到表格的DataTable
             table.focus()
             print("table.row_count: ", table.row_count)
-            # 确保表格光标在第一行
+            # 确保表格光标在第一行第二列（跳过行号列）
             if table.row_count > 0:
-                table.move_cursor(row=0, column=0, animate=False)
+                table.move_cursor(row=0, column=1, animate=False)
             return True
         return False
 
@@ -213,7 +214,12 @@ class SSHConnScreen(Screen):
         local_forwards: Dict[str, str] = {}
         for row_key in table.rows.keys():
             row_data = table.get_row(row_key)
-            local_port, forward_host, forward_port = row_data
+            # 现在数据格式是：(行号, local_port, forward_host, forward_port)
+            # 但DataTable可能返回更多列，所以我们只取前4个
+            if len(row_data) == 4:
+                _, local_port, forward_host, forward_port = row_data[:4]
+            else:
+                continue  # 如果数据不完整，跳过这一行
 
             if not local_port:
                 continue
@@ -231,7 +237,8 @@ class SSHConnScreen(Screen):
                 self.notify("Invalid forward port", severity="error", timeout=0.2)
                 continue
 
-            if not all(row_data):
+            # 检查除行号外的其他数据是否完整
+            if not all([local_port, forward_host, forward_port]):
                 continue
 
             local_forwards[local_port] = f"{forward_host}:{forward_port}"
@@ -241,7 +248,14 @@ class SSHConnScreen(Screen):
             print(f"[INFO] New host configs: {local_forwards}")
             print("[INFO] Host configs have changed, updating host config")
             self.host_config.local_forwards = local_forwards
-            connection = create_persistent_ssh_connection(self.host_config)
+            with self.app.suspend():
+                connection = create_persistent_ssh_connection(self.host_config)
+            if connection is None:
+                self.notify("Failed to create new SSH connection", severity="error", timeout=1)
+            else:
+                self.notify(f"New SSH connection created successfully", timeout=1)
+
+
 
     @on(Button.Pressed, "#new_shell")
     def new_shell(self) -> None:

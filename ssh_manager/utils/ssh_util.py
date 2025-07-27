@@ -200,7 +200,7 @@ class SSHConnection(subprocess.Popen):
         # Mark connection as available
         self._available = True
         
-        # Continue monitoring connection with periodic heartbeat
+        # Continue monitoring connection with periodic heartbeatINFO:jetson:stop
         while self._running:
             try:
                 self.stdin.write(command)
@@ -211,12 +211,12 @@ class SSHConnection(subprocess.Popen):
                 self.logger.debug(f"pause.")
                 time.sleep(3)  # Wait 3 seconds between heartbeats
             except (IOError, ValueError):  # Pipe closed
+                print(traceback.print_exc())
                 break
 
         # Connection lost or terminated
-        self.logger.info(f"stop")
+        self.logger.info(f"Running state: {self._running}, stop {self.host_config.host}")
         self._available = False
-        close_persistent_ssh_connection(self.host_config)
 
     def terminate(self) -> None:
         """Override terminate method to ensure daemon thread exits properly.
@@ -224,6 +224,7 @@ class SSHConnection(subprocess.Popen):
         This method stops the daemon thread and closes the persistent SSH connection
         before calling the parent terminate method.
         """
+        self.logger.info(f"Terminate {self.host_config.host}")
         self._running = False
         super().terminate()
         close_persistent_ssh_connection(self.host_config)
@@ -274,7 +275,7 @@ class SSHConnection(subprocess.Popen):
 _PERSISTENT_SSH_CONNECTIONS: Dict[str, SSHConnection] = {}
 
 
-def create_persistent_ssh_connection(host_config: HostConfig) -> Optional[SSHConnection]:
+def create_persistent_ssh_connection(host_config: HostConfig, debug: bool=False) -> Optional[SSHConnection]:
     """Create a persistent SSH connection that can be reused.
     
     This function creates a new SSH connection and stores it in the global
@@ -293,16 +294,21 @@ def create_persistent_ssh_connection(host_config: HostConfig) -> Optional[SSHCon
             os.system('cls')
         else:
             os.system('clear')
+
+        # Terminate existing connection if present
+        close_persistent_ssh_connection(host_config)
             
         # Create new SSH connection
         ssh_connection = SSHConnection(host_config)
-
-        # Terminate existing connection if present
-        if _PERSISTENT_SSH_CONNECTIONS.get(host_config.host):
-            _PERSISTENT_SSH_CONNECTIONS[host_config.host].terminate()
     
         # Store the new connection
         _PERSISTENT_SSH_CONNECTIONS[host_config.host] = ssh_connection
+
+        while True:
+            if debug:
+                time.sleep(0.1)
+            else:
+                break
 
         return ssh_connection
 
