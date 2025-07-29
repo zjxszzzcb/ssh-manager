@@ -8,7 +8,7 @@ import traceback
 import uuid
 
 from paramiko.client import SSHClient
-from paramiko.ssh_exception import SSHException
+from paramiko.ssh_exception import AuthenticationException, SSHException
 from typing import Dict, Optional
 
 from ssh_manager.utils.ssh_configs import HostConfig
