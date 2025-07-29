@@ -8,7 +8,7 @@ import traceback
 import uuid
 
 from paramiko.client import SSHClient
-from paramiko.ssh_exception import AuthenticationException
+from paramiko.ssh_exception import SSHException
 from typing import Dict, Optional
 
 from ssh_manager.utils.ssh_configs import HostConfig
@@ -111,7 +111,7 @@ class SSHConnection(subprocess.Popen):
                 port=self.host_config.port,
                 auth_timeout=3,
             )
-        except AuthenticationException:
+        except SSHException:
             # Fallback to password authentication if key-based auth fails
             for _ in range(3):
                 success, password = self.connect_by_password(self.host_config)
