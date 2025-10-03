@@ -1,19 +1,38 @@
+import platform
+import shutil
 import subprocess
 
 from typing import List
 
 
 def open_new_terminal(commands: List[str]):
-    """
-    Opens a new terminal window and executes 'ssh ym-testenv' command
-    """
-    import platform
-    
-    if platform.system() == "Windows":
-        commands = ['start', 'cmd', '/k'] + commands
-    
-    subprocess.Popen(commands, shell=True, creationflags=subprocess.CREATE_NEW_CONSOLE)
+    """Opens a new terminal window and executes the given commands"""
+    system = platform.system()
 
+    if system == "Windows":
+        cmd = ['start', 'cmd', '/k'] + commands
+        subprocess.Popen(cmd, shell=True, creationflags=subprocess.CREATE_NEW_CONSOLE)
 
-if __name__ == "__main__":
-    open_new_terminal(['ssh', 'ym-testenv'])
+    elif system == "Linux":
+        terminals = [
+            ('x-terminal-emulator', ['-e']),
+            ('gnome-terminal', ['--']),
+            ('konsole', ['-e']),
+            ('xterm', ['-e']),
+        ]
+
+        for terminal_cmd, terminal_args in terminals:
+            if not shutil.which(terminal_cmd):
+                continue
+
+            if terminal_cmd == 'gnome-terminal':
+                cmd = [terminal_cmd] + terminal_args + commands
+            else:
+                cmd = [terminal_cmd] + terminal_args + [' '.join(commands)]
+
+            subprocess.Popen(cmd)
+
+        raise OSError("No suitable terminal emulator found")
+    else:
+        # Future platform support
+        raise NotImplementedError(f"Platform '{system}' is not supported")
