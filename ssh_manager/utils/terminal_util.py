@@ -32,8 +32,10 @@ def open_new_terminal(commands: List[str]):
                 cmd = [terminal_cmd] + terminal_args + [' '.join(commands)]
 
             subprocess.Popen(cmd)
-
-        raise OSError("No suitable terminal emulator found")
+            break
+        
+        else:
+            raise OSError("No suitable terminal emulator found")
     else:
         # Future platform support
         raise NotImplementedError(f"Platform '{system}' is not supported")
