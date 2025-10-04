@@ -6,7 +6,7 @@ from textual.app import ComposeResult
 from textual.screen import Screen
 from textual.binding import Binding
 from textual.widgets import Button, DataTable, Footer, Label
-from textual.containers import Vertical, Center, Middle, VerticalScroll, Horizontal
+from textual.containers import Vertical, Center, VerticalScroll
 
 from ssh_manager.widgets.proxy_table import ProxyManageTable
 from ssh_manager.utils.ssh_configs import HostConfig

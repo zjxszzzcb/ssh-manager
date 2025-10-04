@@ -7,13 +7,31 @@ from textual.widgets import DataTable, Input, TextArea
 from textual.coordinate import Coordinate
 
 from typing import Optional, Sequence
+import re
 
 from ssh_manager.utils.ssh_configs import HostConfig
 from ssh_manager.vendor.textual_textarea import TextEditor
 
 
-def ssh_config_completer(word: str) -> Sequence[tuple[RenderableType, str]]:
-    """SSH 配置补全器"""
+def ssh_config_completer(word: str, line_context: str = "") -> Sequence[tuple[RenderableType, str]]:
+    """SSH 配置补全器
+
+    Args:
+        word: 当前正在输入的单词
+        line_context: 当前行光标前的完整内容（可选）
+    """
+
+    # Check if typing a port number after LocalForward or RemoteForward
+    if line_context:
+        forward_pattern = r'^\s*(LocalForward|RemoteForward)\s+(\d+)\s*$'
+        match = re.match(forward_pattern, line_context)
+
+        if match and word == match.group(2):  # Current word is the port number
+            port = match.group(2)
+            # Provide completion suggestions for port forwarding format
+            return [(f"{port} 127.0.0.1:{port}", f"{port} 127.0.0.1:{port}")]
+
+    # Original completion logic
     suggests_map = {
         'HostN': ('HostName',),
         'H': ('Host', 'HostName'),
@@ -26,6 +44,10 @@ def ssh_config_completer(word: str) -> Sequence[tuple[RenderableType, str]]:
         'U': ('User',),
         'L': ('LocalForward',),
         'R': ('RemoteForward',),
+        'l': ('localhost', ),
+        '1': ('127.0.0.1', '192.168.'),
+        '12': ('127.0.0.1', ),
+        '19': ('192.168.', ),
     }
 
     for key, values in suggests_map.items():
@@ -47,13 +69,28 @@ class HostConfigEditor(TextEditor, inherit_bindings=False):
 
         super().__init__(
             text=text,
-            word_completer=ssh_config_completer,
+            word_completer=self._wrapped_ssh_config_completer,
             **kwargs
         )
 
+    def _wrapped_ssh_config_completer(self, word: str) -> Sequence[tuple[RenderableType, str]]:
+        """Wrapper for ssh_config_completer that passes line context"""
+        line_context = self._get_line_before_cursor() if hasattr(self, 'text_input') and self.text_input else ""
+        return ssh_config_completer(word, line_context)
+
+    def _get_line_before_cursor(self) -> str:
+        """Get the content of the current line from the beginning to the cursor position"""
+        if self.text_input:
+            lno = self.text_input.cursor_location[0]
+            return self.text_input.get_text_range(
+                start=(lno, 0),
+                end=self.text_input.cursor_location
+            )
+        return ""
+
     def load_text(self, text: str):
         self.text = text
-    
+
     def has_cursor(self) -> bool:
         return self.text_input.has_focus
 
