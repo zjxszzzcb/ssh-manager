@@ -69,18 +69,29 @@ class ProxyManageTable(EditableTableWidget):
                 return
     
     def _get_column_widths(self) -> list[int]:
-        """自定义列宽：优化6列布局"""
-        # 总宽度分配给6列
-        total_width = 75
-        # 比例: 行号:目标端口:目标主机:监听端口:监听主机:类型
-        # 按重要性: 1:2:3:2:3:2 = 13
-        total_ratio = 13
-        width_ratios = [1, 2, 3, 2, 3, 2]
+        """自定义列宽：基于内容需求的比例分配"""
+        # 基于实际内容需求的比例：
+        # #: 行号 - 最小比例
+        # Target Port: 端口号需要11字符
+        # Target Host: 域名/IP需要更多空间
+        # Listen Port: 同Target Port
+        # Listen Host: 同Target Host
+        # Type: 只需要显示Local/Remote
+
+        total_width = 70  # 总宽度
+        # 比例分配: 行号:目标端口:目标主机:监听端口:监听主机:类型
+        width_ratios = [1, 4, 4, 4, 4, 2]  # 总比例 = 19
+        total_ratio = sum(width_ratios)
 
         column_widths = []
-        for i, ratio in enumerate(width_ratios):
-            width = max(3, (total_width * ratio) // total_ratio)
+        for ratio in width_ratios:
+            width = (total_width * ratio) // total_ratio
             column_widths.append(width)
+
+        # 确保最小宽度
+        min_widths = [2, 8, 10, 8, 10, 5]
+        for i in range(len(column_widths)):
+            column_widths[i] = max(column_widths[i], min_widths[i])
 
         print(f"[DEBUG] Column widths: {column_widths}, total: {sum(column_widths)}")
         return column_widths

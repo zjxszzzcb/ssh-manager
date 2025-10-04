@@ -6,7 +6,7 @@ from textual.app import ComposeResult
 from textual.screen import Screen
 from textual.binding import Binding
 from textual.widgets import Button, DataTable, Footer, Label
-from textual.containers import Vertical, Center, Middle
+from textual.containers import Vertical, Center, Middle, VerticalScroll
 
 from ssh_manager.widgets.proxy_table import ProxyManageTable
 from ssh_manager.utils.ssh_configs import HostConfig
@@ -29,6 +29,10 @@ class SSHConnScreen(Screen):
 
     Middle {
         background: #161b22;
+    }
+
+    VerticalScroll {
+        height: 100%;
     }
 
     #content_container {
@@ -159,8 +163,8 @@ class SSHConnScreen(Screen):
         label_text = "\n".join(label_lines)
         print(f"[DEBUG] Creating label with text: {label_text}")
 
-        with Center():
-            with Middle():
+        with VerticalScroll():
+            with Center():
                 with Vertical(id="content_container"):
                     yield Label(label_text, id="host_label")
                     yield Button("🔌 Connect Shell", id="connect_shell")
