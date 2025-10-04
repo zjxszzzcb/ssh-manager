@@ -1,3 +1,4 @@
+import os
 import platform
 import shutil
 import subprocess
@@ -36,3 +37,15 @@ def open_new_terminal(commands: List[str]):
     else:
         # Future platform support
         raise NotImplementedError(f"Platform '{system}' is not supported")
+
+
+CLEAR_COMMAND = 'cls' if platform.system().lower() == 'windows' else 'clear'
+def clear_terminal(func):
+    """Decorator to clear the terminal before executing the function"""
+    def wrapper(*args, **kwargs):
+        try:
+            os.system(CLEAR_COMMAND)
+            return func(*args, **kwargs)
+        finally:
+            os.system(CLEAR_COMMAND)
+    return wrapper

@@ -11,7 +11,7 @@ from textual.containers import Vertical, Center, Middle
 from ssh_manager.widgets.proxy_table import ProxyManageTable
 from ssh_manager.utils.ssh_configs import HostConfig
 from ssh_manager.utils.ssh_util import create_persistent_ssh_connection
-from ssh_manager.utils.terminal_util import open_new_terminal
+from ssh_manager.utils.terminal_util import open_new_terminal, CLEAR_COMMAND
 
 
 class SSHConnScreen(Screen):
@@ -278,16 +278,12 @@ class SSHConnScreen(Screen):
     @on(Button.Pressed, "#connect_shell")
     def connect_shell(self) -> None:
         """在当前终端中直接连接SSH"""
-        print("[DEBUG] Connect shell button clicked")
-        ssh_command = self.host_config.get_ssh_command()
-        ssh_command_str = ' '.join(ssh_command)
-        print(f"[DEBUG] Executing SSH command: {ssh_command_str}")
-
         with self.app.suspend():
-            # 使用 os.system 在当前终端执行，支持完整的交互式环境
-            os.system(ssh_command_str)
-
-        self.notify("SSH session closed", timeout=2)
+            os.system(CLEAR_COMMAND)
+            command = ' '.join(self.host_config.get_ssh_command())
+            print(f"> {command}")
+            os.system(command)
+            os.system(CLEAR_COMMAND)
 
 
 # 这个独立运行的部分需要修改为使用App来包装Screen

@@ -1,6 +1,5 @@
 import logging
 import os
-import platform
 import subprocess
 import threading
 import time
@@ -12,6 +11,7 @@ from paramiko.ssh_exception import AuthenticationException, SSHException
 from typing import Dict, Optional
 
 from ssh_manager.utils.ssh_configs import HostConfig
+from ssh_manager.utils.terminal_util import clear_terminal
 
 
 def load_public_key():
@@ -98,9 +98,12 @@ class SSHConnection(subprocess.Popen):
         password authentication if needed. It also handles SSH public key upload
         for future key-based authentication.
         """
+        # TODO: Implement paramiko SSHClient support for proxy connections
         if self.host_config.proxy_command or self.host_config.proxy_jump:
             print(f"[WARNING] paramiko SSHClient is disabled in proxy mode")
-            # TODO: Implement paramiko SSHClient support for proxy connections
+            return
+        elif not self.host_config.password:
+            print(f"[WARNING] paramiko SSHClient is disabled without password")
             return
         try:
             print(
@@ -288,6 +291,7 @@ class SSHConnection(subprocess.Popen):
 _PERSISTENT_SSH_CONNECTIONS: Dict[str, SSHConnection] = {}
 
 
+@clear_terminal
 def create_persistent_ssh_connection(host_config: HostConfig, debug: bool=False) -> Optional[SSHConnection]:
     """Create a persistent SSH connection that can be reused.
     
@@ -303,12 +307,6 @@ def create_persistent_ssh_connection(host_config: HostConfig, debug: bool=False)
         Optional[SSHConnection]: The created SSH connection, or None if creation failed
     """
     try:
-        # Clear terminal screen based on operating system
-        if platform.system() == "Windows":
-            os.system('cls')
-        else:
-            os.system('clear')
-
         # Terminate existing connection if present
         close_persistent_ssh_connection(host_config)
             
