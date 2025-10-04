@@ -18,37 +18,36 @@ def create_ascii_table(data: list[tuple[str, str, str]]) -> str:
     """
     Create an ASCII table from a list of (icon, label, value) tuples.
     Using fixed character positions to ensure perfect alignment.
+    Total width: 70 characters (display width)
     """
     lines = []
 
-    # Fixed borders - these will always align
-    border_top =    "┌──────────────────────────┬──────────────────────────┐"
-    border_middle = "├──────────────────────────┼──────────────────────────┤"
-    border_bottom = "└──────────────────────────┴──────────────────────────┘"
+    # Fixed borders - exactly 70 display chars
+    border_top =    "┌──────────────────────────────────┬──────────────────────────────────┐"
+    border_middle = "├──────────────────────────────────┼──────────────────────────────────┤"
+    border_bottom = "└──────────────────────────────────┴──────────────────────────────────┘"
 
     lines.append(border_top)
 
     for i, (icon, label, value) in enumerate(data):
-        # Build the row with exact spacing
-        # Left side: icon + label (fixed positions)
-        # Right side: value (right-aligned)
+        # Build each row to be exactly 70 display chars
+        # Left column: 35 chars (including border)
+        # Middle border: 1 char
+        # Right column: 34 chars (including border)
 
-        # Format based on known labels for consistent spacing
-        if "SSH Connection" in label:
-            row = f"│ {icon} SSH Connection        │{value:>25} │"
-        elif "Host" in label:
-            row = f"│ {icon} Host                  │{value:>25} │"
-        elif "Port" in label:
-            row = f"│ {icon} Port                  │{value:>25} │"
-        elif "User" in label:
-            row = f"│ {icon} User                  │{value:>25} │"
-        elif "Password" in label:
-            row = f"│ {icon} Password              │{value:>25} │"
-        else:
-            # Generic formatting for unknown labels
-            label_padded = label[:20].ljust(20)
-            row = f"│ {icon} {label_padded} │{value:>25} │"
+        # Create left content with icon and label
+        left_content = f" {icon} {label}"
 
+        # Calculate padding needed (emoji displays as 2 chars but len() counts as 1)
+        # So we need to subtract 1 extra space for the emoji
+        left_padding = 34 - len(left_content) - 1  # -1 for emoji display width
+        left_side = "│" + left_content + " " * left_padding
+
+        # Create right content
+        right_padding = 33 - len(value)
+        right_side = "│" + " " * right_padding + value + " │"
+
+        row = left_side + right_side
         lines.append(row)
 
         # Add separator between rows (except after the last row)
@@ -100,7 +99,7 @@ class SSHConnScreen(Screen):
     }
 
     .table-width-button {
-        width: 70;  /* Same width as the ASCII table (70 chars) */
+        width: 73;  /* Same width as the ASCII table (73 chars) */
         margin: 0 0 1 0;  /* Small bottom margin for spacing between buttons */
         background: #1f6feb;
         color: #ffffff;
