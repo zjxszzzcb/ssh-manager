@@ -6,8 +6,20 @@ from ssh_manager.widgets.editor import EditableTableWidget
 
 class ProxyManageTable(EditableTableWidget):
 
-    def __init__(self, data: Optional[Sequence[Sequence[str]]] = None, **kwargs):
-        super().__init__(columns=["#", "Local Port", "Forwarded Host", "Forwarded Port"], data=data, **kwargs)
+    def __init__(self, data: Optional[Sequence[Sequence[str]]] = None, mode: str = "local", **kwargs):
+        """Initialize ProxyManageTable with configurable mode.
+
+        Args:
+            data: Initial table data
+            mode: Either "local" for LocalForward or "remote" for RemoteForward
+            **kwargs: Additional arguments passed to parent class
+        """
+        self.mode = mode
+        if mode == "remote":
+            columns = ["#", "Remote Port", "Local Host", "Local Port"]
+        else:
+            columns = ["#", "Local Port", "Forwarded Host", "Forwarded Port"]
+        super().__init__(columns=columns, data=data, **kwargs)
     
     async def on_key(self, event: events.Key) -> None:
         """处理按键事件，防止编辑行号列。"""

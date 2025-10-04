@@ -161,13 +161,24 @@ class SSHConnection(subprocess.Popen):
 
     def add_local_forward(self, local_port: str, forward_host: str, forward_port: int):
         """Add a local port forwarding rule to the SSH connection.
-        
+
         Args:
             local_port (str): Local port to forward from
             forward_host (str): Target host to forward to
             forward_port (int): Target port to forward to
         """
         self.host_config.local_forwards[local_port] = f"{forward_host}:{forward_port}"
+        create_persistent_ssh_connection(self.host_config)
+
+    def add_remote_forward(self, remote_port: str, local_host: str, local_port: int):
+        """Add a remote port forwarding rule to the SSH connection.
+
+        Args:
+            remote_port (str): Remote port to forward from
+            local_host (str): Local host to forward to
+            local_port (int): Local port to forward to
+        """
+        self.host_config.remote_forwards[remote_port] = f"{local_host}:{local_port}"
         create_persistent_ssh_connection(self.host_config)
 
     def exec_command(self, command: str) -> str:

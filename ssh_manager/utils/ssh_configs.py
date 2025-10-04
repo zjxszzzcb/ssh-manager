@@ -28,22 +28,26 @@ class HostConfig(BaseModel):
     
     def get_ssh_command(self) -> List[str]:
         """Generate SSH command arguments list for this host configuration.
-        
+
         Returns:
             List[str]: Complete SSH command arguments including connection parameters and port forwarding
         """
         # Build basic SSH command with port, user, and hostname
         ssh_command_args = ['ssh', '-p', str(self.port), f'{self.user}@{self.hostname}']
-        local_forwards_commands = []
-        
+        port_forwarding_commands = []
+
         # Add local port forwarding arguments (-L flag)
         for local_port, remote_host_port in self.local_forwards.items():
-            local_forwards_commands.extend(["-L", f"{local_port}:{remote_host_port}"])
-        
+            port_forwarding_commands.extend(["-L", f"{local_port}:{remote_host_port}"])
+
+        # Add remote port forwarding arguments (-R flag)
+        for remote_port, local_host_port in self.remote_forwards.items():
+            port_forwarding_commands.extend(["-R", f"{remote_port}:{local_host_port}"])
+
         # Add proxy command if specified
         if self.proxy_command:
             ssh_command_args.extend(["-o", f"ProxyCommand={self.proxy_command}"])
-        
+
         # Add proxy jump if specified, resolve proxy jump host config if available
         if self.proxy_jump:
             proxy_jump = self.proxy_jump
@@ -52,9 +56,9 @@ class HostConfig(BaseModel):
                 # Convert proxy jump host alias to full user@hostname:port format
                 proxy_jump = f"{known_host_config.user}@{known_host_config.hostname}:{known_host_config.port}"
             ssh_command_args.extend(["-J", proxy_jump])
-        
+
         # Combine base command with port forwarding arguments
-        return ssh_command_args + local_forwards_commands
+        return ssh_command_args + port_forwarding_commands
 
     def update_config(self, config: "HostConfig"):
         """Update current configuration with values from another HostConfig.
@@ -98,6 +102,11 @@ class HostConfig(BaseModel):
         for local_port, remote_host_port in self.local_forwards.items():
             texts.append(f"{indent}# localhost:{local_port} -> remote's {remote_host_port}\n")
             texts.append(f"{indent}LocalForward {local_port} {remote_host_port}\n")
+
+        # Add remote port forwarding rules
+        for remote_port, local_host_port in self.remote_forwards.items():
+            texts.append(f"{indent}# remote:{remote_port} -> localhost's {local_host_port}\n")
+            texts.append(f"{indent}RemoteForward {remote_port} {local_host_port}\n")
 
         # Add proxy command if present
         if self.proxy_command:
@@ -332,6 +341,7 @@ def parse_ssh_command(cmd_args: Sequence[str]) -> Optional[HostConfig]:
     parser.add_argument("command", choices=['ssh'])
     parser.add_argument("host")
     parser.add_argument("-L", nargs="*", default=[], dest='local_forwards')
+    parser.add_argument("-R", nargs="*", default=[], dest='remote_forwards')
 
     parser.add_argument("-p", "--port", type=int, required=False, default=22)
     parser.add_argument("--password", type=str, required=False, default=None)
@@ -367,13 +377,32 @@ def parse_ssh_command(cmd_args: Sequence[str]) -> Optional[HostConfig]:
     # Parse local port forwarding arguments (-L local_port:target_host:target_port)
     local_forwards = {}
     for local_forward in args.local_forwards:
-        local_port, target_host, target_port = local_forward.split(":")
+        parts = local_forward.split(":")
+        if len(parts) != 3:
+            print(f'Error LocalForward: {local_forward}')
+            continue
+        local_port, target_host, target_port = parts
 
         if not all([local_port, target_host, target_port]):
             print(f'Error LocalForward: {local_forward}')
             continue
 
         local_forwards[local_port] = f"{target_host}:{target_port}"
+
+    # Parse remote port forwarding arguments (-R remote_port:target_host:target_port)
+    remote_forwards = {}
+    for remote_forward in args.remote_forwards:
+        parts = remote_forward.split(":")
+        if len(parts) != 3:
+            print(f'Error RemoteForward: {remote_forward}')
+            continue
+        remote_port, target_host, target_port = parts
+
+        if not all([remote_port, target_host, target_port]):
+            print(f'Error RemoteForward: {remote_forward}')
+            continue
+
+        remote_forwards[remote_port] = f"{target_host}:{target_port}"
 
     # Create new host configuration from parsed arguments
     host_config = HostConfig(
@@ -382,7 +411,8 @@ def parse_ssh_command(cmd_args: Sequence[str]) -> Optional[HostConfig]:
         user=user,
         port=args.port,
         password=args.password,
-        local_forwards=local_forwards
+        local_forwards=local_forwards,
+        remote_forwards=remote_forwards
     )
 
     # Merge with known configuration if exists (prioritize command line arguments)

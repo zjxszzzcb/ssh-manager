@@ -92,7 +92,7 @@ class SSHConnScreen(Screen):
         border: round #1f6feb;
     }
 
-    #table_label {
+    #local_table_label, #remote_table_label {
         width: 100%;
         height: 1;
         text-align: center;
@@ -126,7 +126,13 @@ class SSHConnScreen(Screen):
             # 为ProxyManageTable添加空的行号列（第一列将被自动填充）
             local_forwards.append(("", local_port, *forward_address.split(":")))
         print(f"[DEBUG] Local forwards: {local_forwards}")
-        
+
+        remote_forwards = []
+        for remote_port, local_address in self.host_config.remote_forwards.items():
+            # 为ProxyManageTable添加空的行号列（第一列将被自动填充）
+            remote_forwards.append(("", remote_port, *local_address.split(":")))
+        print(f"[DEBUG] Remote forwards: {remote_forwards}")
+
         # 创建多行标签文本
         label_lines = [
             f"⚡ SSH Connection: {self.host_config.host}",
@@ -136,20 +142,28 @@ class SSHConnScreen(Screen):
             label_lines.append(f"🙋‍♂️ User: {self.host_config.user}")
         if self.host_config.password:
             label_lines.append(f"🔑 Password: {self.host_config.password}")
-        
+
         label_text = "\n".join(label_lines)
         print(f"[DEBUG] Creating label with text: {label_text}")
-        
+
         with Center():
             with Middle():
                 with Vertical(id="content_container"):
                     yield Label(label_text, id="host_label")
                     yield Button("🔌 Connect Shell", id="connect_shell")
                     yield Button("🚀 New Shell", id="new_shell")
-                    yield Label("🔗 Port Forwarding", id="table_label")
-                    table = ProxyManageTable(local_forwards)
-                    table.can_focus = True
-                    yield table
+
+                    # Local Port Forwarding table
+                    yield Label("🔗 Local Port Forwarding", id="local_table_label")
+                    local_table = ProxyManageTable(local_forwards, mode="local", id="local_forwards_table")
+                    local_table.can_focus = True
+                    yield local_table
+
+                    # Remote Port Forwarding table
+                    yield Label("🔄 Remote Port Forwarding", id="remote_table_label")
+                    remote_table = ProxyManageTable(remote_forwards, mode="remote", id="remote_forwards_table")
+                    remote_table.can_focus = True
+                    yield remote_table
 
         yield Footer()
 
@@ -158,9 +172,12 @@ class SSHConnScreen(Screen):
         print("[DEBUG] SSHConnUI on_mount")
         self.query_one("#connect_shell", Button).focus()
         # 确保表格可以获得焦点
-        table = self.query_one(ProxyManageTable)
-        table.can_focus = True
-        table.data_table.can_focus = True
+        local_table = self.query_one("#local_forwards_table", ProxyManageTable)
+        local_table.can_focus = True
+        local_table.data_table.can_focus = True
+        remote_table = self.query_one("#remote_forwards_table", ProxyManageTable)
+        remote_table.can_focus = True
+        remote_table.data_table.can_focus = True
     
     def on_key(self, event: events.Key) -> None:
         if event.key == "up":
@@ -176,16 +193,24 @@ class SSHConnScreen(Screen):
         """处理向上键：在表格内部导航，当在表格第一行时切换到按钮"""
         new_shell_button = self.query_one("#new_shell", Button)
         connect_shell_button = self.query_one("#connect_shell", Button)
-        table = self.query_one(ProxyManageTable).query_one(DataTable)
-        print(f"[DEBUG] Cursor up - Table has focus: {table.has_focus}")
+        local_table = self.query_one("#local_forwards_table", ProxyManageTable).query_one(DataTable)
+        remote_table = self.query_one("#remote_forwards_table", ProxyManageTable).query_one(DataTable)
 
-        if table.has_focus:
-            # 如果表格有焦点且光标在第一行，切换到 new_shell 按钮
-            print(f"table.cursor_row: {table.cursor_row}")
-            if table.cursor_row == 0:
+        if remote_table.has_focus:
+            # 如果远程表格有焦点且光标在第一行，切换到本地表格
+            if remote_table.cursor_row == 0:
+                if local_table.row_count > 0:
+                    local_table.focus()
+                    local_table.move_cursor(row=local_table.row_count - 1, column=1, animate=False)
+                else:
+                    new_shell_button.focus()
+                return True
+            return False
+        elif local_table.has_focus:
+            # 如果本地表格有焦点且光标在第一行，切换到 new_shell 按钮
+            if local_table.cursor_row == 0:
                 new_shell_button.focus()
                 return True
-            # 否则让表格处理向上导航
             return False
         elif new_shell_button.has_focus:
             # 如果 new_shell 按钮有焦点，切换到 connect_shell 按钮
@@ -199,36 +224,41 @@ class SSHConnScreen(Screen):
         """处理向下键：从按钮切换到表格"""
         new_shell_button = self.query_one("#new_shell", Button)
         connect_shell_button = self.query_one("#connect_shell", Button)
-        table = self.query_one(ProxyManageTable).query_one(DataTable)
-        print(f"[DEBUG] Cursor down - Connect Shell has focus: {connect_shell_button.has_focus}, New Shell has focus: {new_shell_button.has_focus}")
+        local_table = self.query_one("#local_forwards_table", ProxyManageTable).query_one(DataTable)
+        remote_table = self.query_one("#remote_forwards_table", ProxyManageTable).query_one(DataTable)
 
         if connect_shell_button.has_focus:
             # 从 connect_shell 按钮切换到 new_shell 按钮
             new_shell_button.focus()
             return True
         elif new_shell_button.has_focus:
-            # 从 new_shell 按钮切换到表格
-            table.focus()
-            print("table.row_count: ", table.row_count)
+            # 从 new_shell 按钮切换到本地表格
+            local_table.focus()
             # 确保表格光标在第一行第二列（跳过行号列）
-            if table.row_count > 0:
-                table.move_cursor(row=0, column=1, animate=False)
+            if local_table.row_count > 0:
+                local_table.move_cursor(row=0, column=1, animate=False)
             return True
+        elif local_table.has_focus:
+            # 从本地表格最后一行切换到远程表格
+            if local_table.cursor_row == local_table.row_count - 1:
+                remote_table.focus()
+                if remote_table.row_count > 0:
+                    remote_table.move_cursor(row=0, column=1, animate=False)
+                return True
+            return False
         return False
 
     def monitor_proxy_table(self) -> None:
         """监控代理表"""
         # print("[DEBUG] Monitoring proxy table")
-        
-        table = self.query_one(ProxyManageTable).query_one(DataTable)
-        
-        # 打印表格中的每行数据
+
+        # 监控本地端口转发表格
+        local_table = self.query_one("#local_forwards_table", ProxyManageTable).query_one(DataTable)
         local_forwards: Dict[str, str] = {}
-        for row_key in table.rows.keys():
-            row_data = table.get_row(row_key)
+        for row_key in local_table.rows.keys():
+            row_data = local_table.get_row(row_key)
             # 现在数据格式是：(行号, local_port, forward_host, forward_port)
-            # 但DataTable可能返回更多列，所以我们只取前4个
-            if len(row_data) == 4:
+            if len(row_data) >= 4:
                 _, local_port, forward_host, forward_port = row_data[:4]
             else:
                 continue  # 如果数据不完整，跳过这一行
@@ -255,17 +285,61 @@ class SSHConnScreen(Screen):
 
             local_forwards[local_port] = f"{forward_host}:{forward_port}"
 
+        # 监控远程端口转发表格
+        remote_table = self.query_one("#remote_forwards_table", ProxyManageTable).query_one(DataTable)
+        remote_forwards: Dict[str, str] = {}
+        for row_key in remote_table.rows.keys():
+            row_data = remote_table.get_row(row_key)
+            # 现在数据格式是：(行号, remote_port, local_host, local_port)
+            if len(row_data) >= 4:
+                _, remote_port, local_host, local_port = row_data[:4]
+            else:
+                continue  # 如果数据不完整，跳过这一行
+
+            if not remote_port:
+                continue
+            try:
+                int(remote_port)
+            except ValueError:
+                self.notify("Invalid remote port", severity="error", timeout=0.2)
+                continue
+
+            if not local_port:
+                continue
+            try:
+                int(local_port)
+            except ValueError:
+                self.notify("Invalid local port", severity="error", timeout=0.2)
+                continue
+
+            # 检查除行号外的其他数据是否完整
+            if not all([remote_port, local_host, local_port]):
+                continue
+
+            remote_forwards[remote_port] = f"{local_host}:{local_port}"
+
+        # 检查配置是否有变化
+        config_changed = False
         if local_forwards != self.host_config.local_forwards:
-            print(f"[INFO] Old host configs: {self.host_config.local_forwards}")
-            print(f"[INFO] New host configs: {local_forwards}")
-            print("[INFO] Host configs have changed, updating host config")
+            print(f"[INFO] Old local forwards: {self.host_config.local_forwards}")
+            print(f"[INFO] New local forwards: {local_forwards}")
             self.host_config.local_forwards = local_forwards
+            config_changed = True
+
+        if remote_forwards != self.host_config.remote_forwards:
+            print(f"[INFO] Old remote forwards: {self.host_config.remote_forwards}")
+            print(f"[INFO] New remote forwards: {remote_forwards}")
+            self.host_config.remote_forwards = remote_forwards
+            config_changed = True
+
+        if config_changed:
+            print("[INFO] Host configs have changed, updating SSH connection")
             with self.app.suspend():
                 connection = create_persistent_ssh_connection(self.host_config)
             if connection is None:
                 self.notify("Failed to create new SSH connection", severity="error", timeout=1)
             else:
-                self.notify(f"New SSH connection created successfully", timeout=1)
+                self.notify(f"SSH connection updated successfully", timeout=1)
 
     @on(Button.Pressed, "#new_shell")
     def new_shell(self) -> None:
@@ -299,8 +373,12 @@ def view_ssh_conn_ui():
                 user="user1",
                 password="password1",
                 local_forwards={
-                    "443": "example.com:80",
-                    "80": "example2.com:443",
+                    "8080": "localhost:80",
+                    "3306": "db.internal:3306",
+                },
+                remote_forwards={
+                    "9000": "localhost:9000",
+                    "5432": "localhost:5432",
                 }
             )
             self.install_screen(SSHConnScreen(host_config), name="ssh_conn")
