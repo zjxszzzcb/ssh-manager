@@ -6,6 +6,7 @@ build-backend = "flit_core.buildapi"
 name = "ssh_manager"
 version = "0.0.2"
 description = "manage ssh"
+requires-python = ">=3.10"
 
 dependencies = [
     "textual",
