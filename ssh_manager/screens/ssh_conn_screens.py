@@ -1,3 +1,4 @@
+import os
 from typing import Dict
 
 from textual import on, events
@@ -143,6 +144,7 @@ class SSHConnScreen(Screen):
             with Middle():
                 with Vertical(id="content_container"):
                     yield Label(label_text, id="host_label")
+                    yield Button("🔌 Connect Shell", id="connect_shell")
                     yield Button("🚀 New Shell", id="new_shell")
                     yield Label("🔗 Port Forwarding", id="table_label")
                     table = ProxyManageTable(local_forwards)
@@ -154,7 +156,7 @@ class SSHConnScreen(Screen):
     def on_mount(self) -> None:
         """初始化界面"""
         print("[DEBUG] SSHConnUI on_mount")
-        self.query_one("#new_shell", Button).focus()
+        self.query_one("#connect_shell", Button).focus()
         # 确保表格可以获得焦点
         table = self.query_one(ProxyManageTable)
         table.can_focus = True
@@ -172,30 +174,40 @@ class SSHConnScreen(Screen):
     
     def cursor_up(self) -> bool:
         """处理向上键：在表格内部导航，当在表格第一行时切换到按钮"""
-        button = self.query_one("#new_shell", Button)
+        new_shell_button = self.query_one("#new_shell", Button)
+        connect_shell_button = self.query_one("#connect_shell", Button)
         table = self.query_one(ProxyManageTable).query_one(DataTable)
         print(f"[DEBUG] Cursor up - Table has focus: {table.has_focus}")
-        
+
         if table.has_focus:
-            # 如果表格有焦点且光标在第一行，切换到按钮
+            # 如果表格有焦点且光标在第一行，切换到 new_shell 按钮
             print(f"table.cursor_row: {table.cursor_row}")
             if table.cursor_row == 0:
-                button.focus()
+                new_shell_button.focus()
                 return True
             # 否则让表格处理向上导航
             return False
+        elif new_shell_button.has_focus:
+            # 如果 new_shell 按钮有焦点，切换到 connect_shell 按钮
+            connect_shell_button.focus()
+            return True
         else:
-            print("table has no focus")
+            print("no widget has focus for up navigation")
             return False
 
     def cursor_down(self) -> bool:
         """处理向下键：从按钮切换到表格"""
-        button = self.query_one("#new_shell", Button)
+        new_shell_button = self.query_one("#new_shell", Button)
+        connect_shell_button = self.query_one("#connect_shell", Button)
         table = self.query_one(ProxyManageTable).query_one(DataTable)
-        print(f"[DEBUG] Cursor down - Button has focus: {button.has_focus}")
-        
-        if button.has_focus:
-            # 先聚焦到表格的DataTable
+        print(f"[DEBUG] Cursor down - Connect Shell has focus: {connect_shell_button.has_focus}, New Shell has focus: {new_shell_button.has_focus}")
+
+        if connect_shell_button.has_focus:
+            # 从 connect_shell 按钮切换到 new_shell 按钮
+            new_shell_button.focus()
+            return True
+        elif new_shell_button.has_focus:
+            # 从 new_shell 按钮切换到表格
             table.focus()
             print("table.row_count: ", table.row_count)
             # 确保表格光标在第一行第二列（跳过行号列）
@@ -255,8 +267,6 @@ class SSHConnScreen(Screen):
             else:
                 self.notify(f"New SSH connection created successfully", timeout=1)
 
-
-
     @on(Button.Pressed, "#new_shell")
     def new_shell(self) -> None:
         """打开SSH终端"""
@@ -264,6 +274,20 @@ class SSHConnScreen(Screen):
         ssh_command = self.host_config.get_ssh_command()
         print(f"[DEBUG] Generated SSH command: {ssh_command}")
         open_new_terminal(ssh_command)
+
+    @on(Button.Pressed, "#connect_shell")
+    def connect_shell(self) -> None:
+        """在当前终端中直接连接SSH"""
+        print("[DEBUG] Connect shell button clicked")
+        ssh_command = self.host_config.get_ssh_command()
+        ssh_command_str = ' '.join(ssh_command)
+        print(f"[DEBUG] Executing SSH command: {ssh_command_str}")
+
+        with self.app.suspend():
+            # 使用 os.system 在当前终端执行，支持完整的交互式环境
+            os.system(ssh_command_str)
+
+        self.notify("SSH session closed", timeout=2)
 
 
 # 这个独立运行的部分需要修改为使用App来包装Screen

@@ -7,12 +7,9 @@ from textual.binding import Binding
 from textual.logging import TextualHandler
 from typing import List
 
-from ssh_manager.screens.edit_ssh_config import EditSSHConfigScreen
-from ssh_manager.screens.main_screens import SSHManageMainScreen
-from ssh_manager.screens.ssh_conn_screens import SSHConnScreen
+from ssh_manager.screens import EditSSHConfigScreen, SSHManageMainScreen, SSHConnScreen
 from ssh_manager.utils.ssh_configs import (
-    HostConfig, load_ssh_config_file, update_host_config,
-    load_known_ssh_hosts, parse_ssh_command
+    HostConfig, load_ssh_config_file, update_host_config, load_known_ssh_hosts, parse_ssh_command
 )
 
 
