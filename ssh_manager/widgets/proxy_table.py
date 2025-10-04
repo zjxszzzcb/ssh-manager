@@ -229,8 +229,6 @@ class ProxyManageTable(EditableTableWidget):
 
     async def on_input_submitted(self, event) -> None:
         """Handle submitted input and auto-fill Target Port when Listen Port changes."""
-        # Import here to avoid circular dependency
-        from textual.widgets import Input
 
         # Save the current edit coordinates before parent clears them
         edit_coords = self._cell_to_edit_coords

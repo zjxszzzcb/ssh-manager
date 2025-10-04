@@ -4,9 +4,7 @@ from textual.screen import Screen
 from textual.widgets import Header, Footer, Static
 
 from ssh_manager.widgets.editor import TextEditor
-from ssh_manager.utils.ssh_configs import (
-    SSH_CONFIG_FILE_PATH, load_known_ssh_hosts, parse_text_to_configs, update_host_config
-)
+from ssh_manager.utils.ssh_configs import SSH_CONFIG_FILE_PATH, load_known_ssh_hosts
 
 
 # Define the custom screen with two editors
@@ -45,5 +43,6 @@ class EditSSHConfigScreen(Screen):
     def action_save(self) -> None:
         """An action to trigger a save request."""
         left_editor = self.query_one("#left_editor")
+        assert isinstance(left_editor, TextEditor)
         with open(SSH_CONFIG_FILE_PATH, "w", encoding="utf-8") as f:
             f.write(left_editor.text)

@@ -91,7 +91,7 @@ class HostConfigEditor(TextEditor, inherit_bindings=False):
     def load_text(self, text: str):
         self.text = text
 
-    def has_cursor(self) -> bool:
+    def has_cursor(self):
         return self.text_input.has_focus
 
 
