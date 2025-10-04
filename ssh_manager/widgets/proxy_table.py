@@ -20,8 +20,8 @@ class ProxyManageTable(EditableTableWidget):
             data: Initial table data
             **kwargs: Additional arguments passed to parent class
         """
-        # Column order optimized by edit frequency
-        columns = ["#", "Target Port", "Target Host", "Listen Port", "Listen Host", "Type"]
+        # Column order optimized by edit frequency - Listen fields first
+        columns = ["#", "Listen Port", "Listen Host", "Target Port", "Target Host", "Type"]
         super().__init__(columns=columns, data=data, **kwargs)
     
     async def on_key(self, event: events.Key) -> None:
@@ -72,14 +72,14 @@ class ProxyManageTable(EditableTableWidget):
         """自定义列宽：基于内容需求的比例分配"""
         # 基于实际内容需求的比例：
         # #: 行号 - 最小比例
-        # Target Port: 端口号需要11字符
-        # Target Host: 域名/IP需要更多空间
-        # Listen Port: 同Target Port
-        # Listen Host: 同Target Host
+        # Listen Port: 端口号需要11字符
+        # Listen Host: 域名/IP需要更多空间
+        # Target Port: 同Listen Port
+        # Target Host: 同Listen Host
         # Type: 只需要显示Local/Remote
 
         total_width = 70  # 总宽度
-        # 比例分配: 行号:目标端口:目标主机:监听端口:监听主机:类型
+        # 比例分配: 行号:监听端口:监听主机:目标端口:目标主机:类型
         width_ratios = [1, 4, 4, 4, 4, 2]  # 总比例 = 19
         total_ratio = sum(width_ratios)
 
@@ -125,23 +125,34 @@ class ProxyManageTable(EditableTableWidget):
 
         new_row_number = len(self.table_data)  # 新行号
 
-        # 创建新行数据：行号, Target Port, Target Host, Listen Port, Listen Host, Type
+        # 创建新行数据：行号, Listen Port, Listen Host, Target Port, Target Host, Type
         new_data_row_values = [
             str(new_row_number),  # 行号
-            "",                   # Target Port (待填写)
-            "127.0.0.1",         # Target Host (默认值)
-            "",                   # Listen Port (待填写，通常与Target Port相同)
+            "",                   # Listen Port (待填写)
             "127.0.0.1",         # Listen Host (默认值)
+            "",                   # Target Port (待填写，通常与Listen Port相同)
+            "127.0.0.1",         # Target Host (默认值)
             forward_type         # Type (Local或Remote)
         ]
 
         self.table_data.append(list(new_data_row_values))   # 添加到内部数据源
         self.data_table.add_row(*new_data_row_values)
 
-        # 移动光标到新添加行的Target Port列（第1列）
+        # 移动光标到新添加行的Listen Port列（第1列）
         new_row_index = self.data_table.row_count - 1
         if new_row_index >= 0:
             self.data_table.cursor_coordinate = Coordinate(new_row_index, 1)
+            # 移动光标会自动触发滚动到该行
+
+        # 如果父容器是可滚动的，也滚动到底部
+        from textual.containers import VerticalScroll
+        parent = self.parent
+        while parent:
+            if isinstance(parent, VerticalScroll):
+                parent.scroll_end(animate=False)
+                break
+            parent = parent.parent
+
         self.app.bell()     # 发出提示音
 
     # 保留旧的方法以兼容，但建议使用新的快捷键
@@ -205,7 +216,7 @@ class ProxyManageTable(EditableTableWidget):
         # 更新内部数据的行号
         for i in range(1, len(self.table_data)):  # 从1开始，跳过表头
             self.table_data[i][0] = str(i)
-        
+
         # 更新DataTable中所有行的行号
         all_row_keys = list(self.data_table.rows.keys())
         for i, row_key in enumerate(all_row_keys):
@@ -215,6 +226,36 @@ class ProxyManageTable(EditableTableWidget):
             current_row[0] = str(i + 1)
             # 更新DataTable中的行
             self.data_table.update_cell_at(Coordinate(i, 0), str(i + 1))
+
+    async def on_input_submitted(self, event) -> None:
+        """Handle submitted input and auto-fill Target Port when Listen Port changes."""
+        # Import here to avoid circular dependency
+        from textual.widgets import Input
+
+        # Save the current edit coordinates before parent clears them
+        edit_coords = self._cell_to_edit_coords
+
+        # Call parent's handler first
+        await super().on_input_submitted(event)
+
+        # Check if we just edited Listen Port (column 1)
+        if edit_coords and edit_coords.column == 1:
+            table_row_idx = edit_coords.row
+            source_data_row_idx = table_row_idx + 1
+
+            # Get the new Listen Port value
+            if 0 <= source_data_row_idx < len(self.table_data):
+                listen_port = self.table_data[source_data_row_idx][1]  # Listen Port column
+                target_port = self.table_data[source_data_row_idx][3]  # Target Port column
+
+                # If Target Port is empty, auto-fill with Listen Port value
+                if listen_port and not target_port:
+                    self.table_data[source_data_row_idx][3] = listen_port
+                    # Update the visual display
+                    self.data_table.update_cell_at(
+                        Coordinate(table_row_idx, 3),
+                        listen_port
+                    )
 
 
 def view_proxy_manage_table():

@@ -6,12 +6,58 @@ from textual.app import ComposeResult
 from textual.screen import Screen
 from textual.binding import Binding
 from textual.widgets import Button, DataTable, Footer, Label
-from textual.containers import Vertical, Center, Middle, VerticalScroll
+from textual.containers import Vertical, Center, Middle, VerticalScroll, Horizontal
 
 from ssh_manager.widgets.proxy_table import ProxyManageTable
 from ssh_manager.utils.ssh_configs import HostConfig
 from ssh_manager.utils.ssh_util import create_persistent_ssh_connection
 from ssh_manager.utils.terminal_util import open_new_terminal, CLEAR_COMMAND
+
+
+def create_ascii_table(data: list[tuple[str, str, str]]) -> str:
+    """
+    Create an ASCII table from a list of (icon, label, value) tuples.
+    Using fixed character positions to ensure perfect alignment.
+    """
+    lines = []
+
+    # Fixed borders - these will always align
+    border_top =    "┌──────────────────────────┬──────────────────────────┐"
+    border_middle = "├──────────────────────────┼──────────────────────────┤"
+    border_bottom = "└──────────────────────────┴──────────────────────────┘"
+
+    lines.append(border_top)
+
+    for i, (icon, label, value) in enumerate(data):
+        # Build the row with exact spacing
+        # Left side: icon + label (fixed positions)
+        # Right side: value (right-aligned)
+
+        # Format based on known labels for consistent spacing
+        if "SSH Connection" in label:
+            row = f"│ {icon} SSH Connection        │{value:>25} │"
+        elif "Host" in label:
+            row = f"│ {icon} Host                  │{value:>25} │"
+        elif "Port" in label:
+            row = f"│ {icon} Port                  │{value:>25} │"
+        elif "User" in label:
+            row = f"│ {icon} User                  │{value:>25} │"
+        elif "Password" in label:
+            row = f"│ {icon} Password              │{value:>25} │"
+        else:
+            # Generic formatting for unknown labels
+            label_padded = label[:20].ljust(20)
+            row = f"│ {icon} {label_padded} │{value:>25} │"
+
+        lines.append(row)
+
+        # Add separator between rows (except after the last row)
+        if i < len(data) - 1:
+            lines.append(border_middle)
+
+    lines.append(border_bottom)
+
+    return "\n".join(lines)
 
 
 class SSHConnScreen(Screen):
@@ -39,28 +85,34 @@ class SSHConnScreen(Screen):
         background: #161b22;
         width: 80;
         height: auto;
-        margin: 2;
+        margin: 1 2 2 2;  /* top: 1, right: 2, bottom: 2, left: 2 */
     }
 
-    #host_label {
+    #host_info_table {
         width: 100%;
         height: auto;
-        text-align: center;
         background: #161b22;
-        color: #7fb069;
-        margin: 1 0;
-        padding: 1;
-        border: solid #21262d;
-        content-align: center middle;
-        text-style: bold;
+        color: #e6edf3;
+        margin: 0 0 1 0;  /* Small bottom margin */
+        padding: 0;
+        border: none;
+        text-align: center;
     }
 
-    Button {
-        width: 100%;
-        margin: 1 0;
+    .table-width-button {
+        width: 70;  /* Same width as the ASCII table (70 chars) */
+        margin: 0 0 1 0;  /* Small bottom margin for spacing between buttons */
         background: #1f6feb;
         color: #ffffff;
         border: tall transparent;
+        align: center middle;
+    }
+
+    Button {
+        background: #1f6feb;
+        color: #ffffff;
+        border: tall transparent;
+        align: center middle;
     }
 
     Button:focus {
@@ -68,7 +120,9 @@ class SSHConnScreen(Screen):
     }
 
     ProxyManageTable {
-        height: 10;
+        height: auto;
+        min-height: 10;
+        max-height: 20;
         margin: 0;
         background: #161b22;
         overflow-x: hidden;
@@ -76,9 +130,10 @@ class SSHConnScreen(Screen):
     }
 
     #port_forwards_table {
-        height: 10;
-        min-height: 8;
-        max-height: 15;
+        height: auto;
+        min-height: 10;
+        max-height: 20;
+        margin-bottom: 2;
     }
 
     DataTable {
@@ -108,7 +163,7 @@ class SSHConnScreen(Screen):
         text-align: center;
         background: #161b22;
         color: #7fb069;
-        margin: 1 0 0 0;
+        margin: 0;  /* No margin to reduce space between label and table */
         padding: 0;
         border: none;
         content-align: center middle;
@@ -123,52 +178,59 @@ class SSHConnScreen(Screen):
     ]
 
     def __init__(self, host_config: HostConfig):
-        print("[DEBUG] Initializing SSHConnUI")
+        print("[DEBUG] Initializing SSHConnScreen")
         super().__init__()
         self.host_config = host_config
-        print(f"[DEBUG] SSHConnUI initialized with host: {host_config.host}")
+        print(f"[DEBUG] SSHConnScreen initialized with host: {host_config.host}")
         self.set_interval(1/5, self.monitor_proxy_table, name="monitor_proxy_table")
 
     def compose(self) -> ComposeResult:
-        print("[DEBUG] SSHConnUI compose called")
+        print("[DEBUG] SSHConnScreen compose called")
 
         # 合并本地和远程转发到一个统一的列表
-        # 列顺序: #, Target Port, Target Host, Listen Port, Listen Host, Type
+        # 列顺序: #, Listen Port, Listen Host, Target Port, Target Host, Type
         port_forwards = []
 
         # 处理本地转发
         for local_port, forward_address in self.host_config.local_forwards.items():
             target_host, target_port = forward_address.split(":")
             # LocalForward: 监听本地local_port，转发到远程target_host:target_port
-            port_forwards.append(("", target_port, target_host, local_port, "127.0.0.1", "Local"))
+            port_forwards.append(("", local_port, "127.0.0.1", target_port, target_host, "Local"))
 
         # 处理远程转发
         for remote_port, local_address in self.host_config.remote_forwards.items():
             local_host, local_port = local_address.split(":")
             # RemoteForward: 监听远程remote_port，转发到本地local_host:local_port
-            port_forwards.append(("", local_port, local_host, remote_port, "127.0.0.1", "Remote"))
+            port_forwards.append(("", remote_port, "127.0.0.1", local_port, local_host, "Remote"))
 
         print(f"[DEBUG] Port forwards: {port_forwards}")
-
-        # 创建多行标签文本
-        label_lines = [
-            f"⚡ SSH Connection: {self.host_config.host}",
-            f"🌐 Hostname: {self.host_config.hostname} | Port: {self.host_config.port}",
-        ]
-        if self.host_config.user:
-            label_lines.append(f"🙋‍♂️ User: {self.host_config.user}")
-        if self.host_config.password:
-            label_lines.append(f"🔑 Password: {self.host_config.password}")
-
-        label_text = "\n".join(label_lines)
-        print(f"[DEBUG] Creating label with text: {label_text}")
 
         with VerticalScroll():
             with Center():
                 with Vertical(id="content_container"):
-                    yield Label(label_text, id="host_label")
-                    yield Button("🔌 Connect Shell", id="connect_shell")
-                    yield Button("🚀 New Shell", id="new_shell")
+                    # Prepare data for the ASCII table
+                    table_data = [
+                        ("⚡", "SSH Connection", self.host_config.host),
+                        ("🌐", "Host", self.host_config.hostname),
+                        ("📍", "Port", str(self.host_config.port)),
+                    ]
+
+                    if self.host_config.user:
+                        table_data.append(("👤", "User", self.host_config.user))
+
+                    if self.host_config.password:
+                        # Show the actual password
+                        table_data.append(("🔑", "Password", self.host_config.password))
+
+                    # Create and display the ASCII table
+                    table_text = create_ascii_table(table_data)
+                    yield Label(table_text, id="host_info_table")
+
+                    # Buttons with same width as table, centered and stacked vertically
+                    with Center():
+                        yield Button("🔌 Connect Shell", id="connect_shell", classes="table-width-button")
+                    with Center():
+                        yield Button("🚀 New Shell", id="new_shell", classes="table-width-button")
 
                     # 单一的端口转发表格
                     yield Label("🔗 Port Forwarding", id="port_forwarding_label")
@@ -247,21 +309,13 @@ class SSHConnScreen(Screen):
 
         for row_key in port_table.rows.keys():
             row_data = port_table.get_row(row_key)
-            # 数据格式：(行号, Target Port, Target Host, Listen Port, Listen Host, Type)
+            # 数据格式：(行号, Listen Port, Listen Host, Target Port, Target Host, Type)
             if len(row_data) < 6:
                 continue
 
-            _, target_port, target_host, listen_port, listen_host, forward_type = row_data[:6]
+            _, listen_port, listen_host, target_port, target_host, forward_type = row_data[:6]
 
             # 验证端口号
-            if not target_port:
-                continue
-            try:
-                int(target_port)
-            except ValueError:
-                self.notify("Invalid target port", severity="error", timeout=0.2)
-                continue
-
             if not listen_port:
                 continue
             try:
@@ -270,8 +324,16 @@ class SSHConnScreen(Screen):
                 self.notify("Invalid listen port", severity="error", timeout=0.2)
                 continue
 
+            if not target_port:
+                continue
+            try:
+                int(target_port)
+            except ValueError:
+                self.notify("Invalid target port", severity="error", timeout=0.2)
+                continue
+
             # 检查必要字段
-            if not all([target_port, target_host, listen_port]):
+            if not all([listen_port, target_port, target_host]):
                 continue
 
             # 根据类型分配到不同的字典
