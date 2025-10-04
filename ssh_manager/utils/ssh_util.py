@@ -42,24 +42,24 @@ def load_private_key():
 
 class SSHConnection(subprocess.Popen):
     """SSH connection class that extends subprocess.Popen to manage SSH connections.
-    
+
     This class provides a wrapper around SSH connections with automatic key-based
     authentication, password fallback, and connection monitoring through a daemon thread.
     """
-    
+
     def __init__(self, host_config: HostConfig, **kwargs):
         """Initialize SSH connection with the given host configuration.
-        
+
         Args:
             host_config (HostConfig): Configuration object containing SSH connection details
             **kwargs: Additional arguments passed to subprocess.Popen
-            
+
         Raises:
             TimeoutError: If connection cannot be established within 10 seconds
         """
         self.client = SSHClient()
         self.host_config = host_config
-        self.logger = logging.getLogger(self.host)
+        self.logger = logging.getLogger(self.host_config.host)
 
         # Initialize the SSH client connection
         self._initialize_client()
@@ -93,7 +93,7 @@ class SSHConnection(subprocess.Popen):
 
     def _initialize_client(self):
         """Initialize the SSH client with authentication and proxy settings.
-        
+
         This method attempts key-based authentication first, then falls back to
         password authentication if needed. It also handles SSH public key upload
         for future key-based authentication.
@@ -101,8 +101,12 @@ class SSHConnection(subprocess.Popen):
         if self.host_config.proxy_command or self.host_config.proxy_jump:
             print(f"[WARNING] paramiko SSHClient is disabled in proxy mode")
             # TODO: Implement paramiko SSHClient support for proxy connections
-            return None
+            return
         try:
+            print(
+                f"[INFO] Trying to connect "
+                f"`{self.host_config.user}@{self.host_config.hostname} -p {self.host_config.port}` "
+            )
             # Load system host keys and attempt connection
             self.client.load_system_host_keys()
             self.client.connect(
@@ -119,20 +123,29 @@ class SSHConnection(subprocess.Popen):
                     break
                 self.host_config.password = ""
             else:
-                print(f"Faild to connect `{self.host_config.user}@{self.host_config.hostname}` "
-                      f"on port `{self.host_config.port}`")
+                print(
+                    f"[ERROR] Fail to connect "
+                    f"`{self.host_config.user}@{self.host_config.hostname} -p {self.host_config.port}` "
+                )
                 return
 
-            # Upload SSH public key for future key-based authentication
-            print("[INFO] Uploading SSH public key (~/.ssh/id_rsa.pub)")
-            stdin, stdout, stderr = self.client.exec_command(
-                f"echo \"\n{load_public_key()}\" >> ~/.ssh/authorized_keys"
+            # Ask user if they want to upload SSH public key for future key-based authentication
+            choice = input(
+                "SSH key-based authentication failed but password authentication succeeded. "
+                "mssh requires key-based authentication. Do you want to upload your public key? [y/N]:"
             )
-            stdout = stdout.read().decode('utf-8')
-            stderr = stderr.read().decode('utf-8')
-            print(stdout + stderr)
-            if stdout and not stderr:
-                print("[INFO] Successfully to upload ssh public key")
+
+            if choice.lower() == 'y':
+                # Upload SSH public key for future key-based authentication
+                print("[INFO] Uploading SSH public key (~/.ssh/id_rsa.pub)")
+                stdin, stdout, stderr = self.client.exec_command(
+                    f"echo \"\n{load_public_key()}\" >> ~/.ssh/authorized_keys"
+                )
+                stdout = stdout.read().decode('utf-8')
+                stderr = stderr.read().decode('utf-8')
+                print(stdout + stderr)
+                if stdout and not stderr:
+                    print("[INFO] Successfully uploaded SSH public key")
 
     @property
     def host(self):
@@ -284,6 +297,7 @@ def create_persistent_ssh_connection(host_config: HostConfig, debug: bool=False)
     
     Args:
         host_config (HostConfig): Configuration object containing SSH connection details
+        debug (bool): Whether to enable debug mode
         
     Returns:
         Optional[SSHConnection]: The created SSH connection, or None if creation failed
