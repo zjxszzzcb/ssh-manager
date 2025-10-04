@@ -1,24 +1,27 @@
 from typing import Sequence, Optional
 from textual import events
+from textual.binding import Binding
 from textual.coordinate import Coordinate
 from ssh_manager.widgets.editor import EditableTableWidget
 
 
 class ProxyManageTable(EditableTableWidget):
 
-    def __init__(self, data: Optional[Sequence[Sequence[str]]] = None, mode: str = "local", **kwargs):
-        """Initialize ProxyManageTable with configurable mode.
+    BINDINGS = [
+        Binding("ctrl+l", "add_local_forward", "Add Local Forward"),
+        Binding("ctrl+r", "add_remote_forward", "Add Remote Forward"),
+        Binding("ctrl+d", "delete_selected_row", "Delete Row"),
+    ]
+
+    def __init__(self, data: Optional[Sequence[Sequence[str]]] = None, **kwargs):
+        """Initialize ProxyManageTable as a unified port forwarding table.
 
         Args:
             data: Initial table data
-            mode: Either "local" for LocalForward or "remote" for RemoteForward
             **kwargs: Additional arguments passed to parent class
         """
-        self.mode = mode
-        if mode == "remote":
-            columns = ["#", "Remote Port", "Local Host", "Local Port"]
-        else:
-            columns = ["#", "Local Port", "Forwarded Host", "Forwarded Port"]
+        # Column order optimized by edit frequency
+        columns = ["#", "Target Port", "Target Host", "Listen Port", "Listen Host", "Type"]
         super().__init__(columns=columns, data=data, **kwargs)
     
     async def on_key(self, event: events.Key) -> None:
@@ -33,8 +36,8 @@ class ProxyManageTable(EditableTableWidget):
                 if cursor_coord.row < 0 or cursor_coord.row >= self.data_table.row_count:
                     return
 
-                # 如果光标在行号列（第0列），不允许编辑
-                if cursor_coord.column == 0:
+                # 如果光标在行号列（第0列）或Type列（第5列），不允许编辑
+                if cursor_coord.column == 0 or cursor_coord.column == 5:
                     self.app.bell()  # 发出提示音表示不可编辑
                     return
 
@@ -66,18 +69,19 @@ class ProxyManageTable(EditableTableWidget):
                 return
     
     def _get_column_widths(self) -> list[int]:
-        """自定义列宽：按比例 1:2:4:2 分配"""
-        # 减少总宽度以避免超出容器宽度，考虑到DataTable的内部间距
-        total_width = 70
-        # 总比例为 1+2+4+2 = 9
-        total_ratio = 9
-        width_ratios = [1, 2, 4, 2]  # 行号:本地端口:转发主机:转发端口
-        
+        """自定义列宽：优化6列布局"""
+        # 总宽度分配给6列
+        total_width = 75
+        # 比例: 行号:目标端口:目标主机:监听端口:监听主机:类型
+        # 按重要性: 1:2:3:2:3:2 = 13
+        total_ratio = 13
+        width_ratios = [1, 2, 3, 2, 3, 2]
+
         column_widths = []
         for i, ratio in enumerate(width_ratios):
             width = max(3, (total_width * ratio) // total_ratio)
             column_widths.append(width)
-        
+
         print(f"[DEBUG] Column widths: {column_widths}, total: {sum(column_widths)}")
         return column_widths
     
@@ -96,26 +100,43 @@ class ProxyManageTable(EditableTableWidget):
         
         return row_with_number
 
-    def action_add_new_row(self) -> None:
-        """添加一个新行到表格中，自动添加行号。"""
+    def action_add_local_forward(self) -> None:
+        """添加一个新的LocalForward行（Ctrl+L）。"""
+        self._add_forward_row("Local")
+
+    def action_add_remote_forward(self) -> None:
+        """添加一个新的RemoteForward行（Ctrl+R）。"""
+        self._add_forward_row("Remote")
+
+    def _add_forward_row(self, forward_type: str) -> None:
+        """添加一个新的端口转发行。"""
         assert self.data_table is not None
-        
-        num_columns = len(self.table_data[0])   # 基于表头获取列数
-        new_row_number = len(self.table_data)   # 新行号（因为table_data包含表头，所以长度就是下一个行号）
-        
-        # 创建新行数据：第一列是行号，其他列为空字符串
-        new_data_row_values = [str(new_row_number)] + [""] * (num_columns - 1)
-        
+
+        new_row_number = len(self.table_data)  # 新行号
+
+        # 创建新行数据：行号, Target Port, Target Host, Listen Port, Listen Host, Type
+        new_data_row_values = [
+            str(new_row_number),  # 行号
+            "",                   # Target Port (待填写)
+            "127.0.0.1",         # Target Host (默认值)
+            "",                   # Listen Port (待填写，通常与Target Port相同)
+            "127.0.0.1",         # Listen Host (默认值)
+            forward_type         # Type (Local或Remote)
+        ]
+
         self.table_data.append(list(new_data_row_values))   # 添加到内部数据源
-        
-        # DataTable 会自动为没有提供 key 的行生成唯一的键
-        self.data_table.add_row(*new_data_row_values) 
-        
-        # 移动光标到新添加行的第二个单元格（跳过行号列）
+        self.data_table.add_row(*new_data_row_values)
+
+        # 移动光标到新添加行的Target Port列（第1列）
         new_row_index = self.data_table.row_count - 1
         if new_row_index >= 0:
-            self.data_table.cursor_coordinate = Coordinate(new_row_index, 1)  # 光标移到第二列
+            self.data_table.cursor_coordinate = Coordinate(new_row_index, 1)
         self.app.bell()     # 发出提示音
+
+    # 保留旧的方法以兼容，但建议使用新的快捷键
+    def action_add_new_row(self) -> None:
+        """添加一个新的LocalForward行（保留以兼容）。"""
+        self.action_add_local_forward()
     
     def action_delete_selected_row(self) -> None:
         """删除当前选中的行，并重新编号所有行。"""

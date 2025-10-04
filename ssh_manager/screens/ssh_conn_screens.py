@@ -64,11 +64,17 @@ class SSHConnScreen(Screen):
     }
 
     ProxyManageTable {
-        height: 1fr;
+        height: 10;
         margin: 0;
         background: #161b22;
         overflow-x: hidden;
         scrollbar-size-horizontal: 0;
+    }
+
+    #port_forwards_table {
+        height: 10;
+        min-height: 8;
+        max-height: 15;
     }
 
     DataTable {
@@ -92,7 +98,7 @@ class SSHConnScreen(Screen):
         border: round #1f6feb;
     }
 
-    #local_table_label, #remote_table_label {
+    #port_forwarding_label {
         width: 100%;
         height: 1;
         text-align: center;
@@ -121,17 +127,24 @@ class SSHConnScreen(Screen):
 
     def compose(self) -> ComposeResult:
         print("[DEBUG] SSHConnUI compose called")
-        local_forwards = []
-        for local_port, forward_address in self.host_config.local_forwards.items():
-            # 为ProxyManageTable添加空的行号列（第一列将被自动填充）
-            local_forwards.append(("", local_port, *forward_address.split(":")))
-        print(f"[DEBUG] Local forwards: {local_forwards}")
 
-        remote_forwards = []
+        # 合并本地和远程转发到一个统一的列表
+        # 列顺序: #, Target Port, Target Host, Listen Port, Listen Host, Type
+        port_forwards = []
+
+        # 处理本地转发
+        for local_port, forward_address in self.host_config.local_forwards.items():
+            target_host, target_port = forward_address.split(":")
+            # LocalForward: 监听本地local_port，转发到远程target_host:target_port
+            port_forwards.append(("", target_port, target_host, local_port, "127.0.0.1", "Local"))
+
+        # 处理远程转发
         for remote_port, local_address in self.host_config.remote_forwards.items():
-            # 为ProxyManageTable添加空的行号列（第一列将被自动填充）
-            remote_forwards.append(("", remote_port, *local_address.split(":")))
-        print(f"[DEBUG] Remote forwards: {remote_forwards}")
+            local_host, local_port = local_address.split(":")
+            # RemoteForward: 监听远程remote_port，转发到本地local_host:local_port
+            port_forwards.append(("", local_port, local_host, remote_port, "127.0.0.1", "Remote"))
+
+        print(f"[DEBUG] Port forwards: {port_forwards}")
 
         # 创建多行标签文本
         label_lines = [
@@ -153,17 +166,11 @@ class SSHConnScreen(Screen):
                     yield Button("🔌 Connect Shell", id="connect_shell")
                     yield Button("🚀 New Shell", id="new_shell")
 
-                    # Local Port Forwarding table
-                    yield Label("🔗 Local Port Forwarding", id="local_table_label")
-                    local_table = ProxyManageTable(local_forwards, mode="local", id="local_forwards_table")
-                    local_table.can_focus = True
-                    yield local_table
-
-                    # Remote Port Forwarding table
-                    yield Label("🔄 Remote Port Forwarding", id="remote_table_label")
-                    remote_table = ProxyManageTable(remote_forwards, mode="remote", id="remote_forwards_table")
-                    remote_table.can_focus = True
-                    yield remote_table
+                    # 单一的端口转发表格
+                    yield Label("🔗 Port Forwarding", id="port_forwarding_label")
+                    port_table = ProxyManageTable(port_forwards, id="port_forwards_table")
+                    port_table.can_focus = True
+                    yield port_table
 
         yield Footer()
 
@@ -172,12 +179,9 @@ class SSHConnScreen(Screen):
         print("[DEBUG] SSHConnUI on_mount")
         self.query_one("#connect_shell", Button).focus()
         # 确保表格可以获得焦点
-        local_table = self.query_one("#local_forwards_table", ProxyManageTable)
-        local_table.can_focus = True
-        local_table.data_table.can_focus = True
-        remote_table = self.query_one("#remote_forwards_table", ProxyManageTable)
-        remote_table.can_focus = True
-        remote_table.data_table.can_focus = True
+        port_table = self.query_one("#port_forwards_table", ProxyManageTable)
+        port_table.can_focus = True
+        port_table.data_table.can_focus = True
     
     def on_key(self, event: events.Key) -> None:
         if event.key == "up":
@@ -193,22 +197,11 @@ class SSHConnScreen(Screen):
         """处理向上键：在表格内部导航，当在表格第一行时切换到按钮"""
         new_shell_button = self.query_one("#new_shell", Button)
         connect_shell_button = self.query_one("#connect_shell", Button)
-        local_table = self.query_one("#local_forwards_table", ProxyManageTable).query_one(DataTable)
-        remote_table = self.query_one("#remote_forwards_table", ProxyManageTable).query_one(DataTable)
+        port_table = self.query_one("#port_forwards_table", ProxyManageTable).query_one(DataTable)
 
-        if remote_table.has_focus:
-            # 如果远程表格有焦点且光标在第一行，切换到本地表格
-            if remote_table.cursor_row == 0:
-                if local_table.row_count > 0:
-                    local_table.focus()
-                    local_table.move_cursor(row=local_table.row_count - 1, column=1, animate=False)
-                else:
-                    new_shell_button.focus()
-                return True
-            return False
-        elif local_table.has_focus:
-            # 如果本地表格有焦点且光标在第一行，切换到 new_shell 按钮
-            if local_table.cursor_row == 0:
+        if port_table.has_focus:
+            # 如果表格有焦点且光标在第一行，切换到 new_shell 按钮
+            if port_table.cursor_row == 0:
                 new_shell_button.focus()
                 return True
             return False
@@ -224,99 +217,66 @@ class SSHConnScreen(Screen):
         """处理向下键：从按钮切换到表格"""
         new_shell_button = self.query_one("#new_shell", Button)
         connect_shell_button = self.query_one("#connect_shell", Button)
-        local_table = self.query_one("#local_forwards_table", ProxyManageTable).query_one(DataTable)
-        remote_table = self.query_one("#remote_forwards_table", ProxyManageTable).query_one(DataTable)
+        port_table = self.query_one("#port_forwards_table", ProxyManageTable).query_one(DataTable)
 
         if connect_shell_button.has_focus:
             # 从 connect_shell 按钮切换到 new_shell 按钮
             new_shell_button.focus()
             return True
         elif new_shell_button.has_focus:
-            # 从 new_shell 按钮切换到本地表格
-            local_table.focus()
+            # 从 new_shell 按钮切换到表格
+            port_table.focus()
             # 确保表格光标在第一行第二列（跳过行号列）
-            if local_table.row_count > 0:
-                local_table.move_cursor(row=0, column=1, animate=False)
+            if port_table.row_count > 0:
+                port_table.move_cursor(row=0, column=1, animate=False)
             return True
-        elif local_table.has_focus:
-            # 从本地表格最后一行切换到远程表格
-            if local_table.cursor_row == local_table.row_count - 1:
-                remote_table.focus()
-                if remote_table.row_count > 0:
-                    remote_table.move_cursor(row=0, column=1, animate=False)
-                return True
-            return False
         return False
 
     def monitor_proxy_table(self) -> None:
         """监控代理表"""
         # print("[DEBUG] Monitoring proxy table")
 
-        # 监控本地端口转发表格
-        local_table = self.query_one("#local_forwards_table", ProxyManageTable).query_one(DataTable)
+        # 监控统一的端口转发表格
+        port_table = self.query_one("#port_forwards_table", ProxyManageTable).query_one(DataTable)
         local_forwards: Dict[str, str] = {}
-        for row_key in local_table.rows.keys():
-            row_data = local_table.get_row(row_key)
-            # 现在数据格式是：(行号, local_port, forward_host, forward_port)
-            if len(row_data) >= 4:
-                _, local_port, forward_host, forward_port = row_data[:4]
-            else:
-                continue  # 如果数据不完整，跳过这一行
-
-            if not local_port:
-                continue
-            try:
-                int(local_port)
-            except ValueError:
-                self.notify("Invalid local port", severity="error", timeout=0.2)
-                continue
-
-            if not forward_port:
-                continue
-            try:
-                int(forward_port)
-            except ValueError:
-                self.notify("Invalid forward port", severity="error", timeout=0.2)
-                continue
-
-            # 检查除行号外的其他数据是否完整
-            if not all([local_port, forward_host, forward_port]):
-                continue
-
-            local_forwards[local_port] = f"{forward_host}:{forward_port}"
-
-        # 监控远程端口转发表格
-        remote_table = self.query_one("#remote_forwards_table", ProxyManageTable).query_one(DataTable)
         remote_forwards: Dict[str, str] = {}
-        for row_key in remote_table.rows.keys():
-            row_data = remote_table.get_row(row_key)
-            # 现在数据格式是：(行号, remote_port, local_host, local_port)
-            if len(row_data) >= 4:
-                _, remote_port, local_host, local_port = row_data[:4]
-            else:
-                continue  # 如果数据不完整，跳过这一行
 
-            if not remote_port:
+        for row_key in port_table.rows.keys():
+            row_data = port_table.get_row(row_key)
+            # 数据格式：(行号, Target Port, Target Host, Listen Port, Listen Host, Type)
+            if len(row_data) < 6:
+                continue
+
+            _, target_port, target_host, listen_port, listen_host, forward_type = row_data[:6]
+
+            # 验证端口号
+            if not target_port:
                 continue
             try:
-                int(remote_port)
+                int(target_port)
             except ValueError:
-                self.notify("Invalid remote port", severity="error", timeout=0.2)
+                self.notify("Invalid target port", severity="error", timeout=0.2)
                 continue
 
-            if not local_port:
+            if not listen_port:
                 continue
             try:
-                int(local_port)
+                int(listen_port)
             except ValueError:
-                self.notify("Invalid local port", severity="error", timeout=0.2)
+                self.notify("Invalid listen port", severity="error", timeout=0.2)
                 continue
 
-            # 检查除行号外的其他数据是否完整
-            if not all([remote_port, local_host, local_port]):
+            # 检查必要字段
+            if not all([target_port, target_host, listen_port]):
                 continue
 
-            remote_forwards[remote_port] = f"{local_host}:{local_port}"
+            # 根据类型分配到不同的字典
+            if forward_type == "Local":
+                # LocalForward: 监听本地listen_port，转发到远程target_host:target_port
+                local_forwards[listen_port] = f"{target_host}:{target_port}"
+            elif forward_type == "Remote":
+                # RemoteForward: 监听远程listen_port，转发到本地target_host:target_port
+                remote_forwards[listen_port] = f"{target_host}:{target_port}"
 
         # 检查配置是否有变化
         config_changed = False

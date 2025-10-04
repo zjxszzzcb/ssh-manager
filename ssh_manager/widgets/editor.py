@@ -76,10 +76,11 @@ class EditableTableWidget(Widget):
 
     DataTable {
         width: 100%;
-        min-height: 5; 
-        height: 1fr;   
+        min-height: 4;
+        height: 6;
+        max-height: 10;
         border: round $primary-lighten-1;
-        margin-bottom: 1; 
+        margin-bottom: 1;
     }
 
     DataTable:focus {

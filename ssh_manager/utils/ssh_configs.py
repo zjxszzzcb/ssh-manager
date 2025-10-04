@@ -135,7 +135,7 @@ class HostConfig(BaseModel):
 
 def get_ssh_config_example() -> HostConfig:
     """Generate an example SSH host configuration for demonstration purposes.
-    
+
     Returns:
         HostConfig: Example configuration with random host name and sample settings
     """
@@ -145,6 +145,7 @@ def get_ssh_config_example() -> HostConfig:
         user="root",
         port=22,
         local_forwards={"8000": "localhost:80"},
+        remote_forwards={"9090": "localhost:9090"},
         proxy_jump='jump-machine-host'
     )
 
