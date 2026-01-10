@@ -1,0 +1,10 @@
+services:
+  test-server:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: ssh-test-server
+    hostname: test-server
+    ports:
+      - "2222:22"
+    restart: unless-stopped
