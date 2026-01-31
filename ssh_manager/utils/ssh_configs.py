@@ -21,21 +21,28 @@ class HostConfig(BaseModel):
     host: str                               # Host alias/name used in SSH config
     hostname: str                           # Actual hostname or IP address
     user: str                               # Username for SSH connection
-    password: Optional[str] = None          # Password for authentication (optional)
     port: int = 22                          # SSH port number (default: 22)
     local_forwards: Dict[str, str] = {}     # Local port forwarding rules {local_port: remote_host:remote_port}
     remote_forwards: Dict[str, str] = {}    # Remote port forwarding rules {remote_port: local_host:local_port}
     proxy_command: Optional[str] = None     # ProxyCommand for SSH connection
     proxy_jump: Optional[str] = None        # ProxyJump host for SSH connection
     
-    def get_ssh_command(self) -> List[str]:
+    def get_ssh_command(self, extra_options: List[str] = None) -> List[str]:
         """Generate SSH command arguments list for this host configuration.
+
+        Args:
+            extra_options: Optional list of extra SSH options (e.g., ['-o', 'BatchMode=yes'])
 
         Returns:
             List[str]: Complete SSH command arguments including connection parameters and port forwarding
         """
         # Build basic SSH command with port, user, and hostname
         ssh_command_args = ['ssh', '-p', str(self.port), f'{self.user}@{self.hostname}']
+
+        # Add extra options if provided (insert before port forwarding)
+        if extra_options:
+            ssh_command_args.extend(extra_options)
+
         port_forwarding_commands = []
 
         # Add local port forwarding arguments (-L flag)
@@ -97,12 +104,9 @@ class HostConfig(BaseModel):
         self_config.update(config.model_dump(mode='json'))
         return self.__class__(**self_config)
 
-    def to_text(self, add_password: bool = False) -> str:
+    def to_text(self) -> str:
         """Convert host configuration to SSH config file text format.
-        
-        Args:
-            add_password: Whether to include password in the output text
-            
+
         Returns:
             str: SSH config file format text representation
         """
@@ -115,11 +119,6 @@ class HostConfig(BaseModel):
             f"{indent}User {self.user}\n",
             f"{indent}Port {self.port}\n",
         ]
-
-        # Add password line if requested (not standard SSH config)
-        if add_password and self.password is not None:
-            texts.append(f"{indent}# This is not a standard SSH config\n")
-            texts.append(f"{indent}Password {self.password}\n")
 
         # Add local port forwarding rules
         for local_port, remote_host_port in self.local_forwards.items():
@@ -305,11 +304,6 @@ def parse_text_to_configs(text: str) -> Dict[str, HostConfig]:
             # ProxyJump host alias
             current_config['proxy_jump'] = values[0]
 
-        elif current_host and key == 'password':
-            # Handle password field - convert string "None" to Python None
-            password_value = values[0]
-            current_config[key] = None if password_value.lower() == 'none' else password_value
-
         elif current_host:
             # Handle other SSH config options (hostname, user, etc.)
             current_config[key] = values[0]
@@ -376,7 +370,6 @@ def parse_ssh_command(cmd_args: Sequence[str]) -> Optional[HostConfig]:
     parser.add_argument("-R", nargs="*", default=[], dest='remote_forwards')
 
     parser.add_argument("-p", "--port", type=int, required=False, default=22)
-    parser.add_argument("--password", type=str, required=False, default=None)
     parser.add_argument("-n", "--name", type=str, required=False, default="")
 
     try:
@@ -442,7 +435,6 @@ def parse_ssh_command(cmd_args: Sequence[str]) -> Optional[HostConfig]:
         hostname=hostname,
         user=user,
         port=args.port,
-        password=args.password,
         local_forwards=local_forwards,
         remote_forwards=remote_forwards
     )

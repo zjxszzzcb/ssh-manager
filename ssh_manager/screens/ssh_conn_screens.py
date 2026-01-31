@@ -1,4 +1,5 @@
 import os
+import subprocess
 from typing import Dict
 
 from textual import on, events
@@ -246,10 +247,6 @@ class SSHConnScreen(Screen):
                     if self.host_config.user:
                         table_data.append(("👤", "User", self.host_config.user))
 
-                    if self.host_config.password:
-                        # Show the actual password
-                        table_data.append(("🔑", "Password", self.host_config.password))
-
                     # Create and display the ASCII table
                     table_text = create_ascii_table(table_data)
                     yield Label(table_text, id="host_info_table")
@@ -464,12 +461,19 @@ class SSHConnScreen(Screen):
 
     @on(Button.Pressed, "#connect_shell")
     def connect_shell(self) -> None:
-        """Connect SSH directly in current terminal"""
+        """Connect SSH directly in current terminal, return to TUI after exit."""
         with self.app.suspend():
             os.system(CLEAR_COMMAND)
-            command = ' '.join(self.host_config.get_ssh_command())
-            print(f"> {command}")
-            os.system(command)
+            ssh_cmd = self.host_config.get_ssh_command()
+            command_str = ' '.join(ssh_cmd)
+            print(f"> {command_str}")
+            # Use subprocess.run instead of os.system for better control
+            result = subprocess.run(ssh_cmd)
+            # After user exits SSH, display info and return to TUI directly
+            print(f"\n[INFO] SSH session ended (exit code: {result.returncode})")
+            # Brief pause to show exit message, then auto-return
+            import time
+            time.sleep(0.5)
             os.system(CLEAR_COMMAND)
 
 

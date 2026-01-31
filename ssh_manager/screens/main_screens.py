@@ -159,9 +159,9 @@ class SSHManageMainScreen(Screen):
             
             # Set list selection position
             list_view.index = initial_index
-            
+
             # Update editor to show corresponding config
-            self.update_editor(self.host_configs[initial_index].to_text(add_password=True))
+            self.update_editor(self.host_configs[initial_index].to_text())
 
         # Set timer to update connection status every second
         self.set_interval(1.0, self.update_connection_status)
@@ -194,6 +194,8 @@ class SSHManageMainScreen(Screen):
     
     def get_selected_host_config(self) -> Optional[HostConfig]:
         selected_item = self.get_selected_item()
+        if selected_item is None:
+            return None
         return selected_item.host_info or None
 
     def get_selected_item(self) -> Optional[HostListItem]:
@@ -207,7 +209,15 @@ class SSHManageMainScreen(Screen):
         else:
             return None
     
-    def create_connection(self) -> bool:
+    def create_connection(self, auto_mode: bool = False) -> bool:
+        """Create SSH connection.
+
+        Args:
+            auto_mode: If True, test key auth and prompt for upload; if False, direct connection with timeout
+
+        Returns:
+            bool: True if connection successful, False otherwise
+        """
         logger.info("action_connect triggered")
         host_config = self.get_selected_host_config()
         if not host_config:
@@ -219,16 +229,70 @@ class SSHManageMainScreen(Screen):
         if exist_connection and exist_connection.is_alive():
             return True
 
-        with self.app.suspend():
-            connection = create_persistent_ssh_connection(host_config)
-            success = connection is not None
+        if auto_mode:
+            # Auto mode: test key auth, prompt for upload if needed
+            return self._create_connection_with_key_check(host_config)
+        else:
+            # Manual mode: direct connection with timeout
+            return self._create_connection_direct(host_config)
 
-        list_view = self.query_one(ListView)
-        if connection:
-            self.host_configs[list_view.index] = host_config
-            self.connections[host_config.host] = connection
+    def _create_connection_direct(self, host_config: HostConfig) -> bool:
+        """Manual mode: direct connection attempt with fast timeout.
 
-        return success
+        Args:
+            host_config: Host configuration
+
+        Returns:
+            bool: True if connection successful, False otherwise
+        """
+        try:
+            # Direct connection attempt, 10 second timeout
+            with self.app.suspend():
+                connection = create_persistent_ssh_connection(
+                    host_config,
+                    key_check=False,  # Skip key check for fast connection
+                    timeout=10
+                )
+
+            if connection:
+                self.connections[host_config.host] = connection
+                return True
+            else:
+                self.notify("Connection failed", severity="error")
+                return False
+        except TimeoutError:
+            self.notify("Connection timeout (10s)", severity="error")
+            return False
+        except Exception as e:
+            self.notify(f"Connection error: {e}", severity="error")
+            return False
+
+    def _create_connection_with_key_check(self, host_config: HostConfig) -> bool:
+        """Auto mode: test key auth and prompt for upload if needed.
+
+        Args:
+            host_config: Host configuration
+
+        Returns:
+            bool: True if connection successful, False otherwise
+        """
+        try:
+            # Create connection with key check and upload prompt
+            with self.app.suspend():
+                connection = create_persistent_ssh_connection(
+                    host_config,
+                    key_check=True  # Enable key check and upload prompt
+                )
+
+            if connection:
+                self.connections[host_config.host] = connection
+                return True
+            else:
+                self.notify("Connection failed", severity="error")
+                return False
+        except Exception as e:
+            self.notify(f"Connection error: {e}", severity="error")
+            return False
         
     def cleanup_connections(self):
         for connection in self.connections.values():
@@ -242,7 +306,7 @@ class SSHManageMainScreen(Screen):
         """Update editor when list item is highlighted"""
         item = event.item
         assert isinstance(item, HostListItem)
-        self.update_editor(item.host_info.to_text(add_password=True))
+        self.update_editor(item.host_info.to_text())
 
     def action_cursor_up(self) -> None:
         """Move cursor up"""
@@ -278,7 +342,7 @@ class SSHManageMainScreen(Screen):
         list_view.append(new_item)
         list_view.focus()
         list_view.index = len(list_view.children) - 1
-        self.update_editor(new_item.host_info.to_text(add_password=False))
+        self.update_editor(new_item.host_info.to_text())
 
     def action_save_config(self) -> None:
         """Save current config in editor"""
@@ -288,11 +352,11 @@ class SSHManageMainScreen(Screen):
             selected_config_old = self.get_selected_host_config()
             new_config = list(parse_text_to_configs(editor.text).values())[0]
             for known_host_config in self.host_configs:
-                if selected_config_old.to_text(True) == known_host_config.to_text(True):
+                if selected_config_old.to_text() == known_host_config.to_text():
                     continue
                 if known_host_config.host == new_config.host:
                     self.notify(f"Host {known_host_config.host} already exists.", severity="error")
-                    self.update_editor(selected_config_old.to_text(add_password=True))
+                    self.update_editor(selected_config_old.to_text())
                     return
             self.update_selected_item(new_config)
             # Update config
@@ -329,14 +393,12 @@ def view_main_ui():
             hostname="server1.example.com",
             user="admin",
             port=22,
-            password="123456",
         ),
         HostConfig(
             host="demo-server-2",
             hostname="server2.example.com",
             user="admin",
             port=22,
-            password=None,
         ),
     ]
 

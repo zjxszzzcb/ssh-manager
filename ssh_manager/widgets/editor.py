@@ -1,3 +1,6 @@
+import re
+from typing import Optional, Sequence
+
 from rich.console import RenderableType
 from textual import events
 from textual.app import App, ComposeResult
@@ -5,9 +8,6 @@ from textual.binding import Binding
 from textual.widget import Widget
 from textual.widgets import DataTable, Input, TextArea
 from textual.coordinate import Coordinate
-
-from typing import Optional, Sequence
-import re
 
 from ssh_manager.utils.ssh_configs import HostConfig
 from ssh_manager.vendor.textual_textarea import TextEditor

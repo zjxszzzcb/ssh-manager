@@ -19,15 +19,32 @@ class SSHManagerApp(App):
         Binding("c", "connect", "Connect", show=True),
     ]
 
-    def __init__(self, host_configs: List[HostConfig], selected_config: HostConfig = None):
+    def __init__(self, host_configs: List[HostConfig], selected_config: HostConfig = None, auto_connect: bool = False):
 
         super().__init__()
 
         self.main_screen = SSHManageMainScreen(host_configs, selected=selected_config)
+        self.auto_connect = auto_connect  # Whether to auto-connect on mount
 
     def on_mount(self):
         self.install_screen(self.main_screen, name="main_screen")
         self.push_screen("main_screen")
+
+        # Trigger auto-connect if enabled
+        # Use call_later to ensure ListView is fully mounted first
+        if self.auto_connect:
+            self.call_later(self._check_and_auto_connect)
+
+    def _check_and_auto_connect(self) -> None:
+        """Check if host is selected and trigger auto-connect."""
+        if self.main_screen.get_selected_host_config():
+            self._auto_connect()
+
+    def _auto_connect(self) -> None:
+        """Auto-connect to the selected host."""
+        if self.main_screen.create_connection(auto_mode=True):
+            host_config = self.main_screen.get_selected_host_config()
+            self.push_screen(SSHConnScreen(host_config))
 
     def on_key(self, event: events.Key) -> None:
         """Handle key events"""
@@ -79,11 +96,15 @@ def handle_config_command():
 
 def handle_ssh_command(args):
     """Handle the 'ssh' subcommand for SSH connection management."""
+    from ssh_manager.utils.ssh_util import test_ssh_key_auth, upload_ssh_key_with_ssh
+    import time
+
     # Load known hosts
     host_configs_map = load_known_ssh_hosts()
 
     # Parse SSH command arguments if provided
     cmd_host_config = None
+
     if args.target:
         # Build SSH-style command arguments from parsed args
         ssh_args = []
@@ -99,7 +120,49 @@ def handle_ssh_command(args):
             update_host_config(cmd_host_config)
             host_configs_map[cmd_host_config.host] = cmd_host_config
 
-    # Launch the TUI application
+            # Direct SSH mode: test key auth and connect directly to shell
+            print(f"[INFO] Connecting to {cmd_host_config.host} ({cmd_host_config.user}@{cmd_host_config.hostname}:{cmd_host_config.port})...")
+
+            # Test key authentication
+            success, message = test_ssh_key_auth(cmd_host_config)
+
+            if not success:
+                # Key auth failed - ask user if they want to upload key
+                print(f"[ERROR] {message}")
+                print(f"\n[INFO] Would you like to upload your SSH public key?")
+                print(f"[INFO] This will require password authentication for one-time setup.")
+
+                choice = input("Upload key now? [y/N]: ").strip().lower()
+
+                if choice == 'y':
+                    # Upload key
+                    print(f"\n[INFO] Uploading SSH key to {cmd_host_config.host}...")
+                    upload_success, upload_message = upload_ssh_key_with_ssh(cmd_host_config)
+
+                    if not upload_success:
+                        print(f"[ERROR] Key upload failed: {upload_message}")
+                        return
+
+                    print(f"[INFO] Key uploaded successfully!")
+                    print(f"[INFO] Waiting for server to process the new key...")
+                    time.sleep(2)
+
+                    # Retry key auth test
+                    success, message = test_ssh_key_auth(cmd_host_config)
+
+                    if not success:
+                        print(f"[ERROR] Key authentication still fails after upload: {message}")
+                        return
+
+            # Key auth successful, connect directly to shell
+            print(f"[INFO] Starting SSH session...")
+            ssh_cmd = cmd_host_config.get_ssh_command()
+            import subprocess
+            result = subprocess.run(ssh_cmd)
+            print(f"\n[INFO] SSH session ended (exit code: {result.returncode})")
+            return
+
+    # No target specified - launch TUI application
     host_configs = list(host_configs_map.values())
     app = SSHManagerApp(host_configs, selected_config=cmd_host_config)
     app.run()
