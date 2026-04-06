@@ -11,36 +11,22 @@ SSH Manager is a Terminal User Interface (TUI) application built with Textual fo
 ### Installation
 ```bash
 pip install -e .              # Install in editable mode
-pip install -e ".[dev]"       # Install with dev dependencies (pytest, etc.)
 ```
-
-### Run Tests
-```bash
-pytest                                    # Run all tests
-pytest tests/unit/                        # Run only unit tests
-pytest tests/unit/test_ssh_configs.py     # Run a single test file
-pytest -m unit                            # Run tests by marker
-pytest -m "not slow and not docker"       # Exclude slow/docker tests (default behavior)
-pytest -m docker                          # Run Docker-dependent tests
-pytest --no-cov                           # Skip coverage for faster runs
-```
-
-Test markers: `unit`, `integration`, `ui`, `e2e`, `slow`, `ssh`, `docker`, `snapshot`
-
-Slow and docker tests are skipped by default. Use `-m docker` or `-m slow` to include them.
 
 ### Run Application
 ```bash
-mssh                           # Launch main TUI interface
-mssh init                      # Initialize from ~/.ssh/config
-mssh config                    # Open SSH config editor
-mssh <host-alias>              # Quick connect to known host (opens in new terminal)
-mssh ssh [user@]host [-p PORT] # Connect with custom parameters (direct shell mode)
-mssh --log-level debug         # With debug logging
+mssh                                    # Launch main TUI interface
+mssh init [--force]                     # Initialize from ~/.ssh/config
+mssh config                             # Open SSH config editor
+mssh add <host-alias> -c "ssh ..."      # Add host config from SSH command string
+mssh <host-alias>                       # Quick connect to known host (opens in new terminal)
+mssh ssh [user@]host [-p PORT] [-J proxy] [-t] [remote_command]  # Direct shell mode
+mssh --log-level debug                  # With debug logging
+mssh -v                                 # Show version
 ```
 
 ### Test Environment
-Docker-based SSH test server in `tests/`:
+Docker-based SSH test server in `tests/` (see `tests/README.md` for details):
 ```bash
 cd tests && docker compose up -d    # Start test SSH server on localhost:2222
 cd tests && docker compose down     # Stop test server
@@ -49,21 +35,25 @@ cd tests && docker compose down     # Stop test server
 ## Architecture
 
 ### Entry Point
-- `ssh_manager/app.py` - `main()` with argparse-based command routing. Two Textual apps: `SSHManagerApp` (host management) and `EditorSSHConfigApp` (config editor)
+- `ssh_manager/app.py` - `main()` with argparse-based command routing via `handle_init_command()`, `handle_config_command()`, `handle_add_command()`, `handle_ssh_command()`. Two Textual apps: `SSHManagerApp` (host management) and `EditorSSHConfigApp` (config editor)
 
 ### Core Modules
 
 **Configuration Layer** (`ssh_manager/utils/ssh_configs.py`)
-- `HostConfig` - Pydantic model with SSH params + port forwarding rules, `get_ssh_command()` generates subprocess args
+- `HostConfig` - Pydantic model: `host`, `hostname`, `user`, `port`, `local_forwards`, `remote_forwards`, `proxy_command`, `proxy_jump`, `remote_command`, `request_tty`
+  - `get_ssh_command()` generates subprocess args, `to_text()` / `from_text()` for SSH config text format
 - `parse_text_to_configs()` / `parse_ssh_command()` - Parsers for SSH config text and CLI arguments
-- Dual storage: `~/.ssh/config` (source of truth) ↔ `~/.mssh/config.json` (runtime cache)
+- `load_known_ssh_hosts()` / `load_ssh_config_file()` - Load from JSON cache and SSH config file
+- `update_host_config()` / `remove_host_config()` - Mutate cache + persist to JSON
 - `HOST_CONFIG_CACHE` - In-memory dict for fast lookup
+- Dual storage: `~/.ssh/config` (source of truth) ↔ `~/.mssh/config.json` (runtime cache)
 
 **SSH Connection Layer** (`ssh_manager/utils/ssh_util.py`)
 - Pure subprocess-based SSH (no paramiko/external libs), uses native `ssh` binary
-- `SSHConnection` - Wraps `subprocess.Popen` with daemon monitor thread
-- `SSHConnectionManager` - Thread-safe registry (`RLock`) via global `_connection_manager`
+- `SSHConnection` - Extends `subprocess.Popen` with daemon monitor thread for connection health tracking
+- `SSHConnectionManager` - Thread-safe registry (`RLock`) via global singleton `_connection_manager`
 - `test_ssh_key_auth()` / `upload_ssh_key_with_ssh()` - Key auth test and upload workflow
+- `create_persistent_ssh_connection()` / `close_persistent_ssh_connection()` - High-level connection lifecycle with optional key check + upload prompt
 
 **Terminal Utilities** (`ssh_manager/utils/terminal_util.py`)
 - `open_new_terminal()` - Cross-platform new terminal window (Windows `cmd`, Linux gnome-terminal/xterm)
@@ -71,14 +61,28 @@ cd tests && docker compose down     # Stop test server
 
 **UI Layer** (`ssh_manager/screens/`, `ssh_manager/widgets/`)
 - `SSHManageMainScreen` - Split-pane: host list (left) + config editor (right)
-- `EditSSHConfigScreen` - Dual-pane `~/.ssh/config` editor
-- `SSHConnScreen` - Active connection with port forwarding management
-- `HostListItem` / `HostConfigEditor` / `ProxyTableWidget` / `AddForwardModal` - Reusable widgets
+- `EditSSHConfigScreen` - Dual-pane `~/.ssh/config` editor (left: raw config, right: mssh cache)
+- `SSHConnScreen` - Active connection with port forwarding management, ASCII host info table
+- `HostListItem` - List item with connection status indicator (green/red dot)
+- `HostConfigEditor` - Vendored TextEditor with SSH config autocomplete (`ssh_config_completer`)
+- `ProxyManageTable` - Editable DataTable for port forwarding rules (extends `EditableTableWidget`)
+- `AddPortForwardModal` - Modal dialog for adding new port forwarding rules
+- `EditableTableWidget` - Base widget: editable DataTable with inline cell editing via Input
+- `TextEditor` - Simple TextArea wrapper used in config editor screen
 
 **Vendored** (`ssh_manager/vendor/textual_textarea/`) - Bundled text editor component with autocomplete
 
 ### Key Bindings (TUI)
-- `ESC` - Quit | `C` / `Enter` - Connect to selected host
+
+**Main Screen** (`SSHManageMainScreen`):
+- `ESC` - Quit (only when list has focus) | `C` / `Enter` - Connect to selected host
+- `E` - Focus editor | `Ctrl+S` - Save config | `Ctrl+D` - Delete config | `Ctrl+N` - New config
+
+**Connection Screen** (`SSHConnScreen`):
+- `ESC` - Back to main screen
+
+**Port Forward Table** (`ProxyManageTable`):
+- `Ctrl+L` - Add local forward | `Ctrl+R` - Add remote forward | `Ctrl+D` - Delete row
 
 ### Data Flow
 
