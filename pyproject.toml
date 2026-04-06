@@ -4,7 +4,7 @@ build-backend = "flit_core.buildapi"
 
 [project]
 name = "ssh_manager"
-version = "0.1.0"
+version = "0.2.0"
 description = "A terminal SSH connection manager with TUI for managing configs, port forwarding, and quick connections"
 requires-python = ">=3.10"
 
