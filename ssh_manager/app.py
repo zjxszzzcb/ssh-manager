@@ -149,7 +149,7 @@ def handle_ssh_command(args):
         if args.tty:
             ssh_args.append('-t')
         if args.remote_command:
-            ssh_args.append(args.remote_command)
+            ssh_args.extend(args.remote_command)
 
         cmd_host_config = parse_ssh_command(['ssh'] + ssh_args)
         if cmd_host_config:
@@ -291,7 +291,7 @@ def main():
     )
     parser_ssh.add_argument(
         'remote_command',
-        nargs='?',
+        nargs=argparse.REMAINDER,
         default=None,
         help='Remote command to execute after connection'
     )
