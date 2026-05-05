@@ -26,6 +26,8 @@ class HostConfig(BaseModel):
     remote_forwards: Dict[str, str] = {}    # Remote port forwarding rules {remote_port: local_host:local_port}
     proxy_command: Optional[str] = None     # ProxyCommand for SSH connection
     proxy_jump: Optional[str] = None        # ProxyJump host for SSH connection
+    remote_command: Optional[str] = None    # RemoteCommand to execute on remote host
+    request_tty: bool = False               # RequestTTY: force TTY allocation (-t flag)
     
     def get_ssh_command(self, extra_options: List[str] = None) -> List[str]:
         """Generate SSH command arguments list for this host configuration.
@@ -88,7 +90,17 @@ class HostConfig(BaseModel):
             ssh_command_args.extend(["-J", proxy_jump])
 
         # Combine base command with port forwarding arguments
-        return ssh_command_args + port_forwarding_commands
+        result = ssh_command_args + port_forwarding_commands
+
+        # Add TTY allocation flag if requested
+        if self.request_tty:
+            result.append("-t")
+
+        # Append remote command at the end
+        if self.remote_command:
+            result.append(self.remote_command)
+
+        return result
 
     def update_config(self, config: "HostConfig"):
         """Update current configuration with values from another HostConfig.
@@ -139,6 +151,14 @@ class HostConfig(BaseModel):
         if self.proxy_jump:
             texts.append(f"{indent}# Through host to reach target\n")
             texts.append(f"{indent}ProxyJump {self.proxy_jump}\n")
+
+        # Add TTY allocation request if enabled
+        if self.request_tty:
+            texts.append(f"{indent}RequestTTY yes\n")
+
+        # Add remote command if specified
+        if self.remote_command:
+            texts.append(f"{indent}RemoteCommand {self.remote_command}\n")
 
         return "".join(texts)
     
@@ -304,6 +324,14 @@ def parse_text_to_configs(text: str) -> Dict[str, HostConfig]:
             # ProxyJump host alias
             current_config['proxy_jump'] = values[0]
 
+        elif current_host and key == 'remotecommand':
+            # RemoteCommand: command to execute on the remote host
+            current_config['remote_command'] = " ".join(values).strip('"').strip("'")
+
+        elif current_host and key == 'requesttty':
+            # RequestTTY: force TTY allocation (yes/force → True)
+            current_config['request_tty'] = values[0].lower() in ('yes', 'force')
+
         elif current_host:
             # Handle other SSH config options (hostname, user, etc.)
             current_config[key] = values[0]
@@ -371,11 +399,15 @@ def parse_ssh_command(cmd_args: Sequence[str]) -> Optional[HostConfig]:
 
     parser.add_argument("-p", "--port", type=int, required=False, default=22)
     parser.add_argument("-n", "--name", type=str, required=False, default="")
+    parser.add_argument("-t", action="store_true", default=False, dest='request_tty')
 
     try:
-        args, _ = parser.parse_known_args(cmd_args)
+        args, remaining = parser.parse_known_args(cmd_args)
     except SystemExit:
         return None
+
+    # Remaining args after known options are the remote command
+    remote_command = " ".join(remaining).strip('"').strip("'") if remaining else None
 
     # Load known host configurations from cache
     host_configs_map = load_known_ssh_hosts()
@@ -436,7 +468,9 @@ def parse_ssh_command(cmd_args: Sequence[str]) -> Optional[HostConfig]:
         user=user,
         port=args.port,
         local_forwards=local_forwards,
-        remote_forwards=remote_forwards
+        remote_forwards=remote_forwards,
+        remote_command=remote_command,
+        request_tty=args.request_tty,
     )
 
     # Merge with known configuration if exists (prioritize command line arguments)

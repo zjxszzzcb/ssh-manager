@@ -54,9 +54,14 @@ def ssh_config_completer(word: str, line_context: str = "") -> Sequence[tuple[Re
         'Pr': ('ProxyJump', 'ProxyCommand ssh -W %h:%p',),
         'P': ('Port', 'Password'),
 
+        'RemoteF': ('RemoteForward',),
+        'RemoteC': ('RemoteCommand',),
+        'Rem': ('RemoteForward', 'RemoteCommand'),
+        'Req': ('RequestTTY',),
+        'R': ('RemoteForward', 'RemoteCommand', 'RequestTTY'),
+
         'U': ('User',),
         'L': ('LocalForward',),
-        'R': ('RemoteForward',),
         'l': ('localhost', ),
         '1': ('127.0.0.1', '192.168.'),
         '12': ('127.0.0.1', ),

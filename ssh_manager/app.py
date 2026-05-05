@@ -1,5 +1,7 @@
 import argparse
+import importlib.metadata
 import logging
+import shlex
 
 from textual import events
 from textual.app import App
@@ -94,6 +96,36 @@ def handle_config_command():
     app.run()
 
 
+def handle_add_command(args):
+    """Handle the 'add' subcommand to add a host config from an SSH command string."""
+    # Split command string safely (handles quoted arguments)
+    cmd_parts = shlex.split(args.ssh_command)
+    if not cmd_parts:
+        print("Error: empty command string")
+        return
+
+    # Ensure command starts with 'ssh'
+    if cmd_parts[0] != 'ssh':
+        cmd_parts = ['ssh'] + cmd_parts
+
+    # Parse into HostConfig
+    host_config = parse_ssh_command(cmd_parts)
+    if not host_config:
+        print(f"Error: failed to parse SSH command: {args.ssh_command}")
+        return
+
+    # Override host alias with user-provided name
+    host_config = host_config.model_copy(update={"host": args.host_alias})
+
+    # Persist and launch TUI with the new config selected
+    update_host_config(host_config)
+    host_configs_map = load_known_ssh_hosts()
+    host_configs = list(host_configs_map.values())
+
+    app = SSHManagerApp(host_configs, selected_config=host_config)
+    app.run()
+
+
 def handle_ssh_command(args):
     """Handle the 'ssh' subcommand for SSH connection management."""
     from ssh_manager.utils.ssh_util import test_ssh_key_auth, upload_ssh_key_with_ssh
@@ -114,6 +146,10 @@ def handle_ssh_command(args):
             ssh_args.extend(['-p', str(args.port)])
         if args.proxy_jump:
             ssh_args.extend(['-J', args.proxy_jump])
+        if args.tty:
+            ssh_args.append('-t')
+        if args.remote_command:
+            ssh_args.extend(args.remote_command)
 
         cmd_host_config = parse_ssh_command(['ssh'] + ssh_args)
         if cmd_host_config:
@@ -177,6 +213,11 @@ def main():
 
     # Global options
     parser.add_argument(
+        '-v', '--version',
+        action='version',
+        version=f'{importlib.metadata.version("ssh_manager")} (SSH Manager)'
+    )
+    parser.add_argument(
         "--log-level",
         choices=['debug', 'info', 'warning', 'error'],
         default="warning",
@@ -207,6 +248,22 @@ def main():
         help='Open SSH configuration editor'
     )
 
+    # Add subcommand
+    parser_add = subparsers.add_parser(
+        'add',
+        help='Add host config from SSH command'
+    )
+    parser_add.add_argument(
+        'host_alias',
+        help='Host alias name'
+    )
+    parser_add.add_argument(
+        '-c', '--command',
+        required=True,
+        dest='ssh_command',
+        help='SSH command string (e.g. "ssh -p 22 user@host")'
+    )
+
     # SSH subcommand
     parser_ssh = subparsers.add_parser(
         'ssh',
@@ -225,6 +282,18 @@ def main():
     parser_ssh.add_argument(
         '-J', '--proxy-jump',
         help='ProxyJump host for connection'
+    )
+    parser_ssh.add_argument(
+        '-t', '--tty',
+        action='store_true',
+        default=False,
+        help='Force pseudo-terminal allocation'
+    )
+    parser_ssh.add_argument(
+        'remote_command',
+        nargs=argparse.REMAINDER,
+        default=None,
+        help='Remote command to execute after connection'
     )
 
     # Parse arguments with known args to capture potential host argument
@@ -279,6 +348,9 @@ def main():
     elif args.command == 'config':
         handle_config_command()
         return
+    elif args.command == 'add':
+        handle_add_command(args)
+        return
     elif args.command == 'ssh':
         handle_ssh_command(args)
         return
@@ -308,7 +380,9 @@ def main():
     ssh_args = argparse.Namespace(
         target=None,
         port=None,
-        proxy_jump=None
+        proxy_jump=None,
+        tty=False,
+        remote_command=None
     )
 
     if unknown_args:
